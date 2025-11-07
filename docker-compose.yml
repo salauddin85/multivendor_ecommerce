@@ -1,0 +1,68 @@
+version: '3.8'
+
+services:
+  web:
+    environment:
+      - DJANGO_ENV=production
+    build: 
+        context: .
+        dockerfile: "docker/Dockerfile"
+    command: gunicorn --workers 4 --threads 2 --bind 0.0.0.0:8000 config.wsgi:application --access-logfile - --log-level info --access-logformat '%(h)s %(l)s %(u)s [%(t)s] "%(r)s" %(s)s %(b)s Worker-%(p)s'
+
+    
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+      - redis
+
+  celery:
+    environment:
+      - DJANGO_ENV=production 
+    build: 
+        context: .
+        dockerfile: "docker/Dockerfile"
+    command: celery -A config.celery worker -l info
+    volumes:
+      - .:/app
+    depends_on:
+      - redis
+      - postgres
+      - web
+
+  celery-beat:
+    environment:
+      - DJANGO_ENV=production 
+    build: 
+        context: .
+        dockerfile: "docker/Dockerfile"
+    command: celery -A config beat -l INFO --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    volumes:
+      - .:/app
+    depends_on:
+      - redis
+      - postgres
+      - web
+
+  postgres:
+    image: postgres
+    environment:
+      POSTGRES_DB:  multivendor_ecommerce
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ahmedsalauddin46##
+    volumes:
+      - postgres_data:/var/lib/postgresql
+
+  redis:
+    image: redis:6
+    command:
+      - redis-server
+      - --maxmemory
+      - 512mb
+      - --maxmemory-policy
+      - allkeys-lru
+
+volumes:
+  postgres_data:

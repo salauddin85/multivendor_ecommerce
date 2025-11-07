@@ -1,0 +1,21 @@
+
+# This command creates a new Django app named 'test_dev' inside the 'apps' directory.
+---------------------------------------------------------------------
+mkdir apps\test_dev && python manage.py startapp test_dev apps\test_dev
+mkdir apps\client_contact_us && python manage.py startapp client_contact_us apps\client_contact_us
+
+
+---------------------------------------------------------------------
+(Powershell)
+mkdir apps\authentication; python manage.py startapp authentication apps\authentication
+mkdir apps\blogs; python manage.py startapp blogs apps\blogs
+
+---------------------------------------------------------------------
+# add apps.py file
+name = 'apps.activity_log'  # Corrected name to match the app structure
+---------------------------------------------------------------------
+# Clean up by removing the created app directory(CMD)
+rm -rf apps/test_dev
+
+# Clean up by removing the created app directory (Powershell)
+Remove-Item -Recurse -Force apps\test_dev
