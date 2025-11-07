@@ -8,7 +8,7 @@ mkdir apps\client_contact_us && python manage.py startapp client_contact_us apps
 ---------------------------------------------------------------------
 (Powershell)
 mkdir apps\authentication; python manage.py startapp authentication apps\authentication
-mkdir apps\blogs; python manage.py startapp blogs apps\blogs
+mkdir apps\activity_log; python manage.py startapp activity_log apps\activity_log
 
 ---------------------------------------------------------------------
 # add apps.py file
