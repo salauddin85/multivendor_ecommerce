@@ -42,7 +42,14 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    
+    # 3rd party apps
+    'corsheaders',
+    'rest_framework',
+    'silk',
+    'rest_framework_simplejwt',
+    "rest_framework_simplejwt.token_blacklist",
+    'django_celery_beat',
+    'django_celery_results',
     # custom apps
     'apps.authentication',
     'apps.authorization',
@@ -50,6 +57,9 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'corsheaders.middleware.CorsMiddleware',
+    'apps.authentication.middleware.JWTMiddleware',
+
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -57,6 +67,8 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    # 3rd party middleware
+    'silk.middleware.SilkyMiddleware',
 ]
 
 ROOT_URLCONF = 'config.urls'
@@ -101,6 +113,9 @@ AUTH_PASSWORD_VALIDATORS = [
     {
         'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
     },
+    {
+        "NAME": "apps.authentication.validators.SimplePasswordValidator"
+    },
 ]
 
 
@@ -125,6 +140,10 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')  # Collected files
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# User model setting
+AUTH_USER_MODEL = 'authentication.CustomUser'
+
 
 
 
