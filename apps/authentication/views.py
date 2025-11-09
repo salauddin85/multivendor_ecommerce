@@ -16,12 +16,12 @@ from random import randint
 from django.utils import timezone
 from rest_framework_simplejwt.tokens import RefreshToken
 import logging
-# from apps.activity_log.utils.functions import log_request
+from apps.activity_log.utils.functions import log_request
 # from .utils.function import generate_random_token
 logger = logging.getLogger("myapp")
 from rest_framework_simplejwt.exceptions import TokenError
-# from apps.authorization.tasks import send_otp_email
-# from apps.authorization.models import OTP, VerifySuccessfulEmail
+from apps.authorization.tasks import send_otp_email
+from apps.authorization.models import OTP, VerifySuccessfulEmail
 
 
 class LoginLogoutView(APIView):
@@ -36,8 +36,8 @@ class LoginLogoutView(APIView):
         try:
             serializer = serializers.LoginSerializer(data=request.data)
             if not serializer.is_valid():
-                # log_request(request, "Login failed: invalid data",
-                #             "error", "Invalid serializer data", response_status_code=status.HTTP_400_BAD_REQUEST)
+                log_request(request, "Login failed: invalid data",
+                            "error", "Invalid serializer data", response_status_code=status.HTTP_400_BAD_REQUEST)
                 return Response({
                     "code": 400,
                     "status": "failed",
@@ -50,8 +50,8 @@ class LoginLogoutView(APIView):
             user = authenticate(email=email, password=password)
 
             if not user:
-                # log_request(request, "Login failed: invalid credentials",
-                #             "error", "Invalid email or password", response_status_code=status.HTTP_401_UNAUTHORIZED)
+                log_request(request, "Login failed: invalid credentials",
+                            "error", "Invalid email or password", response_status_code=status.HTTP_401_UNAUTHORIZED)
                 return Response({
                     "code": 401,
                     "status": "failed",
@@ -109,14 +109,14 @@ class LoginLogoutView(APIView):
             )
 
             # Log successful login
-            # log_request(request, "User logged in successfully", "info",
-            #             f"User {user.id} logged in", response_status_code=status.HTTP_200_OK)
+            log_request(request, "User logged in successfully", "info",
+                        f"User {user.id} logged in", response_status_code=status.HTTP_200_OK)
             return response
 
         except Exception as e:
             logger.exception(str(e))
-            # log_request(request, "Login failed: server error", "error",
-            #             str(e), response_status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            log_request(request, "Login failed: server error", "error",
+                        str(e), response_status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
             return Response({
                 "code": 500,
                 "status": "failed",
@@ -159,18 +159,130 @@ class LoginLogoutView(APIView):
                 except TokenError:
                     logger.warning("Invalid refresh token on logout; skipping blacklist.")
 
-            # log_request(request, "User logged out", "info",
-            #             "User logged out successfully", response_status_code=status.HTTP_200_OK)
+            log_request(request, "User logged out", "info",
+                        "User logged out successfully", response_status_code=status.HTTP_200_OK)
             return response
 
         except Exception as e:
             logger.exception(str(e))
-            # log_request(request, "Logout failed: server error", "error",
-            #             str(e), response_status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            log_request(request, "Logout failed: server error", "error",
+                        str(e), response_status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
             return Response({
                 'code': status.HTTP_500_INTERNAL_SERVER_ERROR,
                 'status': "failed",
                 'message': "Error occurred",
                 'errors': {"server_error": [str(e)]}
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class  CommonRegisterEmailView(APIView):
+    permission_classes = []
+    authentication_classes = []
+    
+    def post(self, request):
+        try:
+            data = request.data
+            serializer = serializers.CommonRegisterEmailSerializer(
+                data=data)
+            if serializer.is_valid():
+                serializer.save()
+                with transaction.atomic():
+                    email = serializer.validated_data["email"]
+                    try:
+                        otp = OTP.objects.get(email=email)
+                        otp_value = otp.otp
+                        send_otp_email.delay_on_commit(email, otp_value)
+
+                    except OTP.DoesNotExist:
+                        return Response({
+                            "code": status.HTTP_404_NOT_FOUND,
+                            "message": "Invalid request",
+                            "status": "failed",
+                            "errors": {
+                                'otp': ["OTP for the provided email does not exist."]
+                            }}, status=status.HTTP_404_NOT_FOUND)
+                    response = Response({
+                        "code": status.HTTP_201_CREATED,
+                        "message": "Operation successful",
+                        "status": "success",
+                        "message": "OTP sent successfully",
+                        "to": {
+                            "email": email,
+                        }
+                    }, status=status.HTTP_201_CREATED)
+                    # log the request
+                    log_request(request, "Registration OTP sent", "info", f"OTP sent successfully to '{email}' for  registration", response_status_code=status.HTTP_201_CREATED)
+                    return response
+            
+            return Response({
+                "code": status.HTTP_400_BAD_REQUEST,
+                "message": "Invalid request",
+                "status": "failed",
+                "errors": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            logger.exception(str(e))
+            # log the request
+            log_request(request, "Registration OTP sending failed", "error", "OTP sending for registration failed due to server error", response_status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({
+                "code": status.HTTP_500_INTERNAL_SERVER_ERROR,
+                "message": "error occurred",
+                "status": "failed",
+                'errors': {
+                    'server_error': [str(e)]
+                }}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+ 
+class CommonRegisterOtpVerifyView(APIView):
+    permission_classes = []
+    authentication_classes = []
+    
+    def post(self, request):
+        try:
+            data = request.data
+            serializer = serializers.CommonRegisterOtpVerifySerializer(
+                data=data)
+            if serializer.is_valid():
+                email = serializer.validated_data["email"]
+                otp = serializer.validated_data["otp"]
+                otp_object = OTP.objects.get(email=email, otp=otp)
+                otp_object.delete()
+                try:
+                    models.RegisterVerificationSuccessfulEmail.objects.create(email=email)
+                except Exception as e:
+                    logger.exception(str(e))
+                    # log the request
+                    log_request(request, "Email verification failed", "error", "Email verification failed due to server error", response_status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                    return Response({
+                        "code": status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        "message": "Invalid request",
+                        "status": "failed",
+                        "errors": {
+                            'email': [str(e)]
+                        }}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                # log the request
+                response = Response({
+                                    "code": status.HTTP_200_OK,
+                                    "message": "Email verified successfully",
+                                    "status": "success",
+                                    "email": email,
+                                    }, status=status.HTTP_200_OK)
+                log_request(request, "Email verified", "info", f"Email '{email}' verified successfully", response_status_code=status.HTTP_200_OK)
+                return response
+            
+            return Response({
+                "code": status.HTTP_400_BAD_REQUEST,
+                "message": "Invalid request",
+                "status": "failed",
+                "errors": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            logger.exception(str(e))
+            # log the request
+            log_request(request, "Email verification failed", "error", "Email verification failed due to server error", response_status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({
+                "code": status.HTTP_500_INTERNAL_SERVER_ERROR,
+                "message": "Error occurred",
+                "status": "failed",
+                'errors': {
+                    'server_error': [str(e)]
+                }}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 

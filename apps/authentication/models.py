@@ -1,11 +1,12 @@
-from django.db import models
 
 # Create your models here.
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from django.db import models
 from django.utils import timezone
 from datetime import timedelta
-from .constants.user_type import USER_TYPE_CHOICES
+from .constants.user_type import USER_TYPE_CHOICES, USER_STATUS_CHOICES
+from django.conf import settings
+
 
 
 
@@ -56,6 +57,39 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
 
     def __str__(self):
         return self.email
+
+
+class Customer(models.Model):
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE,related_name='customer_profile')
+    phone_number = models.CharField(max_length=15)
+    
+    def __str__(self):
+        return f"Customer: {self.user.email}"
+
+
+class Vendor(models.Model):
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE,related_name='vendor_profile')
+    phone_number = models.CharField(max_length=15)
+    address = models.CharField(max_length=255)
+    nid_card_pic = models.ImageField(upload_to='vendor/nid_cards/', blank=True, null=True)
+    product_details = models.TextField(blank=True)
+    product_image = models.ImageField(upload_to='vendor/product_images/', blank=True, null=True) 
+    trade_license = models.ImageField(upload_to='vendor/trade_license/', blank=True, null=True)  
+    status = models.CharField(max_length=50, choices=USER_STATUS_CHOICES, default="pending")  
+    def __str__(self):
+        return f"Vendor: {self.user.email}"
+
+class StoreOwner(models.Model):
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE,related_name='store_owner_profile')
+    phone_number = models.CharField(max_length=15)
+    address = models.CharField(max_length=255)
+    nid_card_image = models.ImageField(upload_to='store_owner/nid_cards/', blank=True, null=True)
+    store_details = models.TextField()
+    trade_license = models.ImageField(upload_to='store_owner/trade_license/', blank=True, null=True)
+    status = models.CharField(max_length=50, choices=USER_STATUS_CHOICES, default="pending") 
+    
+    def __str__(self):
+        return f"Store Owner: {self.user.email}"
 
 
 

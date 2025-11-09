@@ -239,12 +239,12 @@ CACHES = {
     }
 }
 
-# CELERY_BEAT_SCHEDULE = {
-#     "flush-activity-logs-every-2-min": {
-#         "task": "apps.activity_log.tasks.flush_activity_logs",
-#         "schedule": crontab(minute="*/2"),
-#     },
-# }
+CELERY_BEAT_SCHEDULE = {
+    "flush-activity-logs-every-2-min": {
+        "task": "apps.activity_log.tasks.flush_activity_logs",
+        "schedule": crontab(minute="*/2"),
+    },
+}
 
 # Email settings for production
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
