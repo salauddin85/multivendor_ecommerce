@@ -5,9 +5,9 @@ urlpatterns = [
     path('v1/login/', views.LoginLogoutView.as_view(), name="login_view"),
     path('v1/logout/', views.LoginLogoutView.as_view(), name="logout_view"),
 
-    # path('v1/register/vendor/', views.RegistrationTrainerView.as_view(), name="register_vendor_view"),
-    # path('v1/register/store_owner/', views.CandidateRegisterView.as_view(), name="register_store_owner_view"),
-    # path('v1/register/customer/', views.CandidateRegisterView.as_view(), name="register_customer_view"),
+    path('v1/register/vendor/', views.VendorRegisterView.as_view(), name="register_vendor_view"),
+    path('v1/register/store_owner/', views.StoreOwnerRegisterView.as_view(), name="register_store_owner_view"),
+    path('v1/register/customer/', views.CustomerRegisterView.as_view(), name="register_customer_view"),
     path('v1/register/email/', views.CommonRegisterEmailView.as_view(), name="register_email_view"),
     path('v1/register/email/verify/', views.CommonRegisterOtpVerifyView.as_view(), name="register_email_verify_view"),
     # path('v1/forget_password/', views.ForgetPasswordView.as_view(),

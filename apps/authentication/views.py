@@ -22,6 +22,7 @@ logger = logging.getLogger("myapp")
 from rest_framework_simplejwt.exceptions import TokenError
 from apps.authorization.tasks import send_otp_email
 from apps.authorization.models import OTP, VerifySuccessfulEmail
+from apps.authentication.tasks import send_register_confirmation_email
 
 
 class LoginLogoutView(APIView):
@@ -286,3 +287,142 @@ class CommonRegisterOtpVerifyView(APIView):
                     'server_error': [str(e)]
                 }}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+
+class VendorRegisterView(APIView):
+    permission_classes = []
+    authentication_classes = []
+
+    def post(self, request):
+        """
+            Register a new vendor user.
+        """
+        data = request.data
+        serializer = serializers.RegistrationVendorSerializer(
+            data=data) 
+        if serializer.is_valid():
+            vendor = serializer.save()  
+            register_verify = models.RegisterVerificationSuccessfulEmail.objects.filter(email=vendor.email)
+            if register_verify.exists():
+                register_verify.delete()
+     
+            # initiate CELERY to send mail
+            send_register_confirmation_email.delay_on_commit(
+                email=vendor.email,
+                context={
+                    "email": vendor.email,
+                    "first_name": vendor.first_name,
+                    "last_name": vendor.last_name,
+                    "user_type": vendor.user_type
+                }
+            )
+            log_request(request, "Vendor registered successfully", "info", f"Vendor {vendor.id} registered", response_status_code=status.HTTP_201_CREATED)
+            return Response({
+                "status": "success",
+                'code': status.HTTP_201_CREATED,
+                'message': "Vendor registered successfully",
+                "data": {
+                    "email": vendor.email,
+                    "first_name": vendor.first_name,
+                    "last_name": vendor.last_name
+                }
+            }, status=status.HTTP_201_CREATED)
+        else:
+            return Response({
+                "status": "failed",
+                'code': status.HTTP_400_BAD_REQUEST,
+                'message': "invalid request",
+                "errors": serializer.errors
+            }, status=status.HTTP_400_BAD_REQUEST)      
+
+class StoreOwnerRegisterView(APIView):
+    permission_classes = []
+    authentication_classes = []
+
+    def post(self, request):
+        """
+            Register a new store owner user.
+        """
+        data = request.data
+        serializer = serializers.RegistrationStoreOwnerSerializer(
+            data=data) 
+        if serializer.is_valid():
+            store_owner = serializer.save()  
+            register_verify = models.RegisterVerificationSuccessfulEmail.objects.filter(email=store_owner.email)
+            if register_verify.exists():
+                register_verify.delete()
+     
+            # initiate CELERY to send mail
+            send_register_confirmation_email.delay_on_commit(
+                email=store_owner.email,
+                context={
+                    "email": store_owner.email,
+                    "first_name": store_owner.first_name,
+                    "last_name": store_owner.last_name,
+                    "user_type": store_owner.user_type
+                }
+            )
+            log_request(request, "Store owner registered successfully", "info", f"Store owner {store_owner.id} registered", response_status_code=status.HTTP_201_CREATED)
+            return Response({
+                "status": "success",
+                'code': status.HTTP_201_CREATED,
+                'message': "Store owner registered successfully",
+                "data": {
+                    "email": store_owner.email,
+                    "first_name": store_owner.first_name,
+                    "last_name": store_owner.last_name
+                }
+            }, status=status.HTTP_201_CREATED)
+        else:
+            return Response({
+                "status": "failed",
+                'code': status.HTTP_400_BAD_REQUEST,
+                'message': "invalid request",
+                "errors": serializer.errors
+            }, status=status.HTTP_400_BAD_REQUEST)
+            
+
+class CustomerRegisterView(APIView):
+    permission_classes = []
+    authentication_classes = []
+
+    def post(self, request):
+        """
+            Register a new customer user.
+        """
+        data = request.data
+        serializer = serializers.RegistrationCustomerSerializer(
+            data=data) 
+        if serializer.is_valid():
+            customer = serializer.save()  
+            register_verify = models.RegisterVerificationSuccessfulEmail.objects.filter(email=customer.email)
+            if register_verify.exists():
+                register_verify.delete()
+     
+            # initiate CELERY to send mail
+            send_register_confirmation_email.delay_on_commit(
+                email=customer.email,
+                context={
+                    "email": customer.email,
+                    "first_name": customer.first_name,
+                    "last_name": customer.last_name,
+                    "user_type": customer.user_type
+                }
+            )
+            log_request(request, "Customer registered successfully", "info", f"Customer {customer.id} registered", response_status_code=status.HTTP_201_CREATED)
+            return Response({
+                "status": "success",
+                'code': status.HTTP_201_CREATED,
+                'message': "Customer registered successfully",
+                "data": {
+                    "email": customer.email,
+                    "first_name": customer.first_name,
+                    "last_name": customer.last_name
+                }
+            }, status=status.HTTP_201_CREATED)
+        else:
+            return Response({
+                "status": "failed",
+                'code': status.HTTP_400_BAD_REQUEST,
+                'message': "invalid request",
+                "errors": serializer.errors
+            }, status=status.HTTP_400_BAD_REQUEST)

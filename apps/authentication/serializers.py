@@ -13,7 +13,7 @@ from apps.authentication.models import CustomUser
 from django.contrib.auth.password_validation import validate_password
 from .validators import SimplePasswordValidator
 from django.core.exceptions import ValidationError
-
+import phonenumbers
 
 
 class LoginSerializer(serializers.Serializer):
@@ -86,4 +86,151 @@ class CommonRegisterOtpVerifySerializer(serializers.Serializer):
                 {'otp': [f"OTP {otp} has expired. Please request a new one."]})
         return super().validate(attrs)
 
-     
+    
+class RegistrationVendorSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    password = serializers.CharField(write_only=True)
+    first_name = serializers.CharField()
+    last_name = serializers.CharField()
+    phone_number = serializers.CharField()
+    address = serializers.CharField()
+    nid_card_pic = serializers.ImageField()
+    product_details = serializers.CharField()
+    product_image = serializers.ImageField()
+    trade_license = serializers.ImageField()
+    
+    def validate_email(self, value):
+        if CustomUser.objects.filter(email=value).exists():
+            raise serializers.ValidationError(f"Email {value} is already in use in the system. Please use a different email.")
+        verify_success = models.RegisterVerificationSuccessfulEmail.objects.filter(
+            email=value).exists()
+        if not verify_success:
+            raise serializers.ValidationError(f"Email {value} is not verified. Please verify your email before registration.")
+        return value
+    
+    def validate_phone_number(self, value):
+        try:
+            phone = phonenumbers.parse(value, None)
+            if not phonenumbers.is_valid_number(phone):
+                raise serializers.ValidationError("Invalid phone number.")
+        except phonenumbers.NumberParseException:
+            raise serializers.ValidationError("Invalid phone number format. Use +<countrycode><number>.")
+        
+        return phonenumbers.format_number(phone, phonenumbers.PhoneNumberFormat.E164)
+    
+    
+    def validate_password(self, value):
+        SimplePasswordValidator().validate(value)
+        return value
+    
+    def create(self, validated_data):
+        email = validated_data.get("email")
+        password = validated_data.get("password")
+        first_name = validated_data.get("first_name")
+        last_name = validated_data.get("last_name")
+        phone_number = validated_data.get("phone_number")
+        address = validated_data.get("address")
+        nid_card_pic = validated_data.get("nid_card_pic")
+        product_details = validated_data.get("product_details")
+        product_image = validated_data.get("product_image")
+        trade_license = validated_data.get("trade_license")
+
+        user = CustomUser.objects.create_user(email=email, password=password, first_name=first_name, last_name=last_name, user_type='vendor')
+        models.Vendor.objects.create(user=user, phone_number=phone_number, address=address, nid_card_pic=nid_card_pic, product_details=product_details, product_image=product_image, trade_license=trade_license)
+        user.save()
+        return user
+
+
+class RegistrationStoreOwnerSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    password = serializers.CharField(write_only=True)
+    first_name = serializers.CharField()
+    last_name = serializers.CharField()
+    phone_number = serializers.CharField()
+    address = serializers.CharField()
+    nid_card_image = serializers.ImageField()
+    store_details = serializers.CharField()
+    trade_license = serializers.ImageField()
+    
+    
+    def validate_email(self, value):
+        if CustomUser.objects.filter(email=value).exists():
+            raise serializers.ValidationError(f"Email {value} is already in use in the system. Please use a different email.")
+        verify_success = models.RegisterVerificationSuccessfulEmail.objects.filter(
+            email=value).exists()
+        if not verify_success:
+            raise serializers.ValidationError(f"Email {value} is not verified. Please verify your email before registration.")
+        return value
+    
+    def validate_phone_number(self, value):
+        try:
+            phone = phonenumbers.parse(value, None)
+            if not phonenumbers.is_valid_number(phone):
+                raise serializers.ValidationError("Invalid phone number.")
+        except phonenumbers.NumberParseException:
+            raise serializers.ValidationError("Invalid phone number format. Use +<countrycode><number>.")
+        
+        return phonenumbers.format_number(phone, phonenumbers.PhoneNumberFormat.E164)
+    
+    def validate_password(self, value):
+        SimplePasswordValidator().validate(value)
+        return value
+    
+    def create(self, validated_data):
+        email = validated_data.get("email")
+        password = validated_data.get("password")
+        first_name = validated_data.get("first_name")
+        last_name = validated_data.get("last_name")
+        phone_number = validated_data.get("phone_number")
+        address = validated_data.get("address")
+        nid_card_image = validated_data.get("nid_card_image")
+        store_details = validated_data.get("store_details")
+        trade_license = validated_data.get("trade_license")
+
+        user = CustomUser.objects.create_user(email=email, password=password, first_name=first_name, last_name=last_name, user_type='store_owner')
+        models.StoreOwner.objects.create(user=user, phone_number=phone_number, address=address, nid_card_image=nid_card_image, store_details=store_details, trade_license=trade_license)
+        user.save()
+        return user
+
+
+class RegistrationCustomerSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    password = serializers.CharField(write_only=True)
+    first_name = serializers.CharField()
+    last_name = serializers.CharField()
+    phone_number = serializers.CharField()
+    
+    def validate_email(self, value):
+        if CustomUser.objects.filter(email=value).exists():
+            raise serializers.ValidationError(f"Email {value} is already in use in the system. Please use a different email.")
+        verify_success = models.RegisterVerificationSuccessfulEmail.objects.filter(
+            email=value).exists()
+        if not verify_success:
+            raise serializers.ValidationError(f"Email {value} is not verified. Please verify your email before registration.")
+        return value
+    
+    def validate_phone_number(self, value):
+        try:
+            phone = phonenumbers.parse(value, None)
+            if not phonenumbers.is_valid_number(phone):
+                raise serializers.ValidationError("Invalid phone number.")
+        except phonenumbers.NumberParseException:
+            raise serializers.ValidationError("Invalid phone number format. Use +<countrycode><number>.")
+        
+        return phonenumbers.format_number(phone, phonenumbers.PhoneNumberFormat.E164)
+        
+    def validate_password(self, value):
+        SimplePasswordValidator().validate(value)
+        return value
+    
+    def create(self, validated_data):
+        email = validated_data.get("email")
+        password = validated_data.get("password")
+        first_name = validated_data.get("first_name")
+        last_name = validated_data.get("last_name")
+        phone_number = validated_data.get("phone_number")
+
+        user = CustomUser.objects.create_user(email=email, password=password, first_name=first_name, last_name=last_name, user_type='customer')
+        models.Customer.objects.create(user=user, phone_number=phone_number)
+        user.save()
+        return user

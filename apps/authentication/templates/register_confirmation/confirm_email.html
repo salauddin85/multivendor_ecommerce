@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Your Organization - Thank You</title>
+    <style>
+      body {
+        background: #f7f7f7;
+        font-family: Arial, sans-serif;
+      }
+      .container {
+        max-width: 480px;
+        margin: 40px auto;
+        background: #fff;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        padding: 32px 24px;
+        text-align: center;
+      }
+      .logo {
+        margin-bottom: 18px;
+      }
+      .logo img {
+        height: 40px;
+      }
+      .smiley {
+        margin-bottom: 20px;
+      }
+      .smiley {
+        font-size: 60px;
+        position: relative;
+      }
+      .heart {
+        color: #f9a826;
+        position: absolute;
+        font-size: 30px;
+        top: 8px;
+        right: -24px;
+      }
+      h1 {
+        font-size: 1.1em;
+        margin-top: 8px;
+      }
+      .desc {
+        color: #3d3d3d;
+        font-size: 1em;
+        line-height: 1.7em;
+        margin-bottom: 20px;
+      }
+      .footer {
+        font-size: 0.95em;
+        color: #888;
+        margin-top: 24px;
+      }
+      a {
+        color: #3da9fc;
+        text-decoration: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      {% comment %}
+      <div class="logo">
+        <img src="{% static 'logo.png' %}" alt="Twist Logo" />
+      </div>
+      {% endcomment %}
+      <div class="smiley">&#128578; <span class="heart">&#10084;</span></div>
+      {% if first_name and last_name %}
+      <h1><p>Hello {{ first_name }} {{ last_name }}</p></h1>
+      {% endif %}
+      <h1>
+        Thank you for Registering as a <b>{{ user_type }}</b> with Your Organization!
+      </h1>
+      <h1>Your registration email is {{ email }}.</h1>
+      <div class="desc">
+        ABC team is the communication app for teams who want to create a calmer,
+        more organized, more productive workplace.<br /><br />
+        We’ll send you an invite to get started soon!
+      </div>
+
+      <div class="footer">
+        Our Best,<br />
+        <strong>The team</strong>
+      </div>
+    </div>
+  </body>
+</html>
