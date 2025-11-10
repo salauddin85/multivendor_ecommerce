@@ -104,7 +104,7 @@ class ForgetPasswordOTP(models.Model):
 
     def is_expired(self):
         """Check if the OTP is expired (valid for 10 minutes)"""
-        return timezone.now() > self.expire_time + timedelta(minutes=2)
+        return timezone.now() > self.expire_time + timedelta(minutes=10)
 
 
 class RegisterVerificationSuccessfulEmail(models.Model):
