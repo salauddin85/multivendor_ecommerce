@@ -145,7 +145,19 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 AUTH_USER_MODEL = 'authentication.CustomUser'
 
 
-
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': ['rest_framework_simplejwt.authentication.JWTAuthentication'],
+    'EXCEPTION_HANDLER': 'apps.authentication.utils.exceptions.custom_exception_handler',
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.UserRateThrottle',  # Throttles per user
+        # Throttles for unauthenticated users
+        'rest_framework.throttling.AnonRateThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'user': '80/minute',  # Limit to 80 requests per minute for authenticated users
+        'anon': '60/minute',  # Limit to 60 requests per minute for anonymous users
+    }
+}
 
 # cors setting
 CORS_ORIGIN_ALLOW_ALL = True

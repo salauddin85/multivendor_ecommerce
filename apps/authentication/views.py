@@ -22,7 +22,8 @@ logger = logging.getLogger("myapp")
 from rest_framework_simplejwt.exceptions import TokenError
 from apps.authorization.tasks import send_otp_email
 from apps.authorization.models import OTP, VerifySuccessfulEmail
-from apps.authentication.tasks import send_register_confirmation_email
+from apps.authentication.tasks import send_register_confirmation_email, send_otp_mail_to_email
+from apps.authentication.utils.function import generate_random_token
 
 
 class LoginLogoutView(APIView):
@@ -424,5 +425,251 @@ class CustomerRegisterView(APIView):
                 "status": "failed",
                 'code': status.HTTP_400_BAD_REQUEST,
                 'message': "invalid request",
+                "errors": serializer.errors
+            }, status=status.HTTP_400_BAD_REQUEST)
+            
+            
+class ForgetPasswordView(APIView):
+    authentication_classes = []
+    permission_classes = []
+
+    def post(self, request):
+        """
+            Set OTP to the OTP model if user with email exist
+        """
+        data = request.data
+        serializer = serializers.ForgetPasswordSerializer(
+            data=data) 
+        if serializer.is_valid():
+            email = serializer.validated_data['email']
+            otp = randint(100000, 999999)  # Generate OTP
+            # Checking if a user with OTP Exist
+            is_exist = models.ForgetPasswordOTP.objects.filter(
+                email=email).exists()
+            if is_exist:
+
+                otp_model = models.ForgetPasswordOTP.objects.get(email=email)
+                otp_model.expire_time = timezone.now()
+                otp_model.otp = otp  
+                otp_model.save()
+                send_otp_mail_to_email.delay_on_commit(otp, email)
+            else:
+                # If new user Create OTP Model
+                models.ForgetPasswordOTP.objects.create(email=email, otp=otp)
+                # initiate CELERY to send mail
+                send_otp_mail_to_email.delay_on_commit(otp, email)
+            return Response({
+                "status": "success",
+                'code': status.HTTP_200_OK,
+                'message': "OTP has been created successfully",
+                "details": "OTP send successful"
+            }, status=status.HTTP_200_OK)
+        else:
+
+            return Response({
+                "status": "failed",
+                'code': status.HTTP_400_BAD_REQUEST,
+                'message': "invalid request",
+                "errors": serializer.errors
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+
+
+class VerifyOtpView(APIView):
+    def post(self, request):
+        """
+            Verify OTP with given email here
+        """
+        try:
+            data = request.data
+            serializer = serializers.VerifyOtpSerializer(data=data)
+            if serializer.is_valid():
+                email = serializer.validated_data["email"]
+                otp = serializer.validated_data['otp']
+                forget_password_otp_obj = get_object_or_404(
+                    models.ForgetPasswordOTP, email=email)
+                if forget_password_otp_obj.otp != otp:  # check if OTP matched
+
+                    return Response({
+                        "code": status.HTTP_400_BAD_REQUEST,
+                        "message": "Failed while verifying OTP",
+                        "status": "failed",
+                        "can_change_pass": False,
+                        "details": "OTP didn't match"
+                    }, status=status.HTTP_400_BAD_REQUEST)
+
+                if forget_password_otp_obj.is_expired():  # check if OTP has expired
+
+                    return Response({
+                        "code": status.HTTP_400_BAD_REQUEST,
+                        "message": "Failed while verifying OTP",
+                        "status": "failed",
+                        "can_change_pass": False,
+                        "details": "OTP expired generate a new OTP"
+                    }, status=status.HTTP_400_BAD_REQUEST)
+
+                try:
+                    token = generate_random_token()
+                    forget_password_otp_obj.token = token
+                    forget_password_otp_obj.save(update_fields=['token'])
+
+                    return Response({
+                        "code": status.HTTP_200_OK,
+                        "message": "Operation successful",
+                        "status": "success",
+                        "can_change_pass": True,
+                        "details": "Generated new Token for changing password",
+                        "token": token
+                    }, status=status.HTTP_200_OK)
+                except Exception as e:
+                    logger.exception(str(e))
+
+                    return Response({
+                        "code": status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        "message": "Error occurred",
+                        "status": "failed",
+                        'errors': {'server_error': [str(e)]}
+
+                    }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+            else:
+
+                return Response({
+                    "code": status.HTTP_400_BAD_REQUEST,
+                    "message": "Invalid request",
+                    "status": "failed",
+                    'errors': serializer.errors
+                }, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+
+            return Response({
+                "code": status.HTTP_500_INTERNAL_SERVER_ERROR,
+                "message": "Something went wrong",
+                'status': "failed",
+                'errors': {
+                    "server_error": [str(e)]
+                }
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+
+class ResetPasswordView(APIView):
+    def get_permissions(self):
+        if self.request.method == "PATCH":
+            return [IsAuthenticated()]
+        else:
+            return [AllowAny()]
+
+    def post(self, request):
+        """
+            Reset password for valid user with valid email address
+        """
+        try:
+            data = request.data
+            serializer = serializers.ResetPasswordSerializer(
+                data=data)  # validate the request
+            if serializer.is_valid():
+                email = serializer.validated_data['email']
+                password = serializer.validated_data['password']
+                pass_change_token = serializer.validated_data['token']
+                forget_password_otp_obj = get_object_or_404(
+                    models.ForgetPasswordOTP, email=email)
+
+                if pass_change_token != forget_password_otp_obj.token:
+
+                    return Response({
+                        'code': status.HTTP_400_BAD_REQUEST,
+                        'status': 'failed',
+                        'message': "Error while matching token",
+                        'detail': 'Token did not match',
+                    }, status=status.HTTP_400_BAD_REQUEST)
+                else:
+                    try:
+                        with transaction.atomic():
+                            user = get_user_model().objects.get(email=email)
+                            user.set_password(password)  # Change password
+                            user.save()
+                            # Create new token and return
+                            refresh = RefreshToken.for_user(user)
+                            access_token = refresh.access_token
+                            forget_password_otp_obj.delete()
+                            response = Response({
+                                "status": "success",
+                                "code": status.HTTP_200_OK,
+                                "message": "Operation successful",
+                                "access_token": str(access_token),
+                                "refresh_token": str(refresh)
+                            }, status=status.HTTP_200_OK)
+                            # set cookie
+                          
+                            response.set_cookie(
+                                settings.SIMPLE_JWT["AUTH_COOKIE"],
+                                str(access_token),
+                                httponly=settings.SIMPLE_JWT["AUTH_COOKIE_HTTP_ONLY"],
+                                secure=os.getenv("COOKIE_SECURE") == "True",
+                                max_age=timedelta(
+                                    days=7).total_seconds()
+                            )
+                            
+                            response.set_cookie(
+                                settings.SIMPLE_JWT["AUTH_COOKIE_USER_TYPE"],
+                                user.user_type,
+                                httponly=settings.SIMPLE_JWT["AUTH_COOKIE_HTTP_ONLY"],
+                                secure=os.getenv("COOKIE_SECURE") == "True",
+                                max_age=timedelta(
+                                    days=7).total_seconds()
+                            )
+
+                            return response
+                    except Exception as e:
+                        logger.exception(str(e))
+
+                        return Response({
+                            "code": status.HTTP_500_INTERNAL_SERVER_ERROR,
+                            "message": "Error occurred",
+                            'status': 'failed', 'detail': str(e),
+                            "errors": {
+                                'server_error': [str(e)]
+                            }
+                        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            else:
+
+                return Response({
+                    "code": status.HTTP_400_BAD_REQUEST,
+                    "message": "Invalid request",
+                    'status': "failed",
+                    'errors': serializer.errors
+                }, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+
+            return Response({
+                "code": status.HTTP_500_INTERNAL_SERVER_ERROR,
+                "message": "Something went wrong",
+                'status': "failed",
+                'errors': {
+                    "server_error": [str(e)]
+                }
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    def patch(self, request):
+
+        user = request.user
+        serializer = serializers.UpdatePasswordSerializer(
+            data=request.data, context={"user": user})
+
+        if serializer.is_valid():
+            serializer.update(user, serializer.validated_data)
+
+            return Response({
+                "code": status.HTTP_200_OK,
+                "message": "Password Updated successfully",
+                "status": "success"
+            }, status=status.HTTP_200_OK)
+        else:
+
+            return Response({
+                "code": status.HTTP_400_BAD_REQUEST,
+                "message": "Invalid request data",
+                "status": "failed",
                 "errors": serializer.errors
             }, status=status.HTTP_400_BAD_REQUEST)

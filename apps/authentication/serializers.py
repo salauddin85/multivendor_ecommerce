@@ -234,3 +234,107 @@ class RegistrationCustomerSerializer(serializers.Serializer):
         models.Customer.objects.create(user=user, phone_number=phone_number)
         user.save()
         return user
+    
+
+class ForgetPasswordSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+    def validate(self, attrs):
+        email = attrs.get("email")
+        is_user_exist_with_email = get_user_model().objects.filter(
+            email=email).exists()
+        if not is_user_exist_with_email:
+            raise serializers.ValidationError({
+                'email': [f"No user exist with {email}"]
+            })
+        return super().validate(attrs)
+
+
+
+class VerifyOtpSerializer(serializers.Serializer):
+    otp = serializers.IntegerField()
+    email = serializers.EmailField()
+    
+    def validate_email(self, value):
+        if not models.CustomUser.objects.filter(email=value).exists():
+            raise serializers.ValidationError(f"No user exist in the system with the email of {value}")
+        return value
+
+    def validate(self, attrs):
+        email = attrs.get("email")
+        otp = attrs.get("otp")
+        is_otp_exist = models.ForgetPasswordOTP.objects.filter(
+            email=email, otp=otp).exists()
+        if not is_otp_exist:
+            raise serializers.ValidationError({
+                'otp': [f"Invalid OTP for {email}"]
+            })
+        return super().validate(attrs)
+
+
+
+class ResetPasswordSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    password = serializers.CharField()
+    token = serializers.CharField()
+    
+    def validate_password(self, value):
+        SimplePasswordValidator().validate(value)
+        return value
+    
+    def validate(self, attrs):
+        email = attrs.get("email")
+        password = attrs.get("password")
+        is_user_exist = get_user_model().objects.filter(
+            email=email).exists()
+        if not is_user_exist:
+            raise serializers.ValidationError({
+                'email': [f"No user exist with {email}"]
+            })
+        if len(password) < 6:
+            raise serializers.ValidationError({
+                'password': ["Password must be 6 character long"]
+            })
+        return super().validate(attrs)
+
+
+
+
+class UpdatePasswordSerializer(serializers.Serializer):
+    current_password = serializers.CharField(max_length=128, write_only=True)
+    new_password = serializers.CharField(max_length=128, write_only=True)
+    confirm_password = serializers.CharField(max_length=128, write_only=True)
+    
+    def validate_new_password(self, value):
+        SimplePasswordValidator().validate(value)
+        return value
+
+    def validate_confirm_password(self, value):
+        SimplePasswordValidator().validate(value)
+        return value
+
+    def validate(self, attrs):
+        user = self.context.get('user')
+        current_password = attrs.get("current_password")
+        new_password = attrs.get("new_password")
+        confirm_password = attrs.get("confirm_password")
+
+        if not user.check_password(current_password):
+            raise serializers.ValidationError(
+                {"current_password": ["Invalid current password"]})
+        if current_password == new_password:
+            raise serializers.ValidationError({"current_password": [
+                                              "current password and new password are same.please choose a different password"]})
+
+        if new_password != confirm_password:
+            raise serializers.ValidationError(
+                {"confirm_password": ["Passwords do not match"]})
+
+        
+
+        return attrs
+
+    def update(self, instance, validated_data):
+        instance.set_password(validated_data["new_password"])
+        instance.save()
+        return instance
