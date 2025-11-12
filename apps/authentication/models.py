@@ -112,3 +112,13 @@ class RegisterVerificationSuccessfulEmail(models.Model):
 
     def __str__(self):
         return self.email
+
+
+class Staff(models.Model):
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='staff_profile')
+    store_owner = models.ForeignKey(StoreOwner, on_delete=models.CASCADE, related_name='staff_members')
+    phone_number = models.CharField(max_length=15, blank=True, null=True)
+    nid_card_image = models.ImageField(upload_to='staff/nid_cards/', blank=True, null=True)
+
+    def __str__(self):
+        return f"Staff: {self.user.email}"

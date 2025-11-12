@@ -1,6 +1,7 @@
 from django.db import models
 from django.utils import timezone
 from datetime import timedelta
+from django.conf import settings
 
 class BaseModel(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
@@ -30,3 +31,26 @@ class VerifySuccessfulEmail(models.Model):
 
     def __str__(self):
         return self.email
+
+
+
+class Permission(BaseModel):
+    code = models.CharField(max_length=100, unique=True) 
+    name = models.CharField(max_length=255) 
+
+    def __str__(self):
+        return f"{self.code}"
+
+class Role(BaseModel):
+    name = models.CharField(max_length=255, unique=True)
+    permissions = models.ManyToManyField(Permission, related_name='roles')
+
+    def __str__(self):
+        return self.name
+
+class AssignRole(BaseModel):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='custom_roles_assigned')
+    roles = models.ManyToManyField(Role, related_name='assigned_users')
+
+    def __str__(self):
+        return self.user.email
