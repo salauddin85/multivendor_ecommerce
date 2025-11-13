@@ -7,6 +7,8 @@ from django.core.exceptions import ValidationError
 from apps.authentication.models import Staff,CustomUser,StoreOwner,Vendor,Customer
 from apps.authentication.validators import SimplePasswordValidator
 import phonenumbers
+from django.utils import timezone
+from datetime import timedelta
 
 
 
@@ -235,7 +237,8 @@ class StaffOnboardingSerializer(serializers.Serializer):
         if is_exists:
             otp_instance = OTP.objects.get(email=email)
             otp_instance.otp = otp
-            otp_instance.save(update_fields=["otp"])
+            otp_instance.is_expired = timezone.now()
+            otp_instance.save(update_fields=["otp", "is_expired"])
         else:
             otp_instance = OTP.objects.create(email=email, otp=otp)
         return otp_instance
