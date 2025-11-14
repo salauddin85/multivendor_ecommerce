@@ -54,6 +54,9 @@ INSTALLED_APPS = [
     'apps.authentication',
     'apps.authorization',
     'apps.activity_log',
+    'apps.products',
+    'apps.catalog',
+    'apps.stores',
 ]
 
 MIDDLEWARE = [
