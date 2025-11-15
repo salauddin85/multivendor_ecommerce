@@ -4,10 +4,15 @@ from django.utils import timezone
 
 
 class CategorySerializer(serializers.Serializer):
+    id = serializers.IntegerField(read_only=True)
+    slug = serializers.SlugField(read_only=True)
     name = serializers.CharField(max_length=255)
     parent = serializers.PrimaryKeyRelatedField(queryset=Category.objects.all(), required=False)
     icon = serializers.ImageField(required=False)
     display_order = serializers.IntegerField(default=0,required=False)
+    created_at = serializers.DateTimeField(read_only=True)
+    updated_at = serializers.DateTimeField(read_only=True)
+    is_active = serializers.BooleanField(required=False, default=True)
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -79,12 +84,12 @@ class CategorySerializer(serializers.Serializer):
 
     def update(self, instance, validated_data):
         instance.name = validated_data.get('name', instance.name)
-        instance.slug = validated_data.get('slug', instance.slug)
         instance.parent = validated_data.get('parent', instance.parent)
         instance.icon = validated_data.get('icon', instance.icon)
+        instance.is_active = validated_data.get('is_active', instance.is_active)
         instance.display_order = validated_data.get('display_order', instance.display_order)
         instance.updated_at = timezone.now()
-        instance.save(update_fields=['name', 'slug', 'parent', 'icon', 'display_order', 'updated_at'])
+        instance.save()
         return instance
     
 
@@ -117,14 +122,30 @@ class CategoryTreeViewSerializer(serializers.ModelSerializer):
 
 
 class BrandSerializer(serializers.Serializer):
+    id = serializers.IntegerField(read_only=True)
     name = serializers.CharField(max_length=255)
     slug = serializers.SlugField(read_only=True)
-    icon = serializers.ImageField(required=False)
+    logo = serializers.ImageField(required=False)
     display_order = serializers.IntegerField(default=0)
+    is_active = serializers.BooleanField(required=False, default=True)
+    
     
     def validate_name(self, value):
+        if self.instance:
+            if self.instance.name == value:
+                return value
         if Brand.objects.filter(name=value).exists():
             raise serializers.ValidationError("Brand with this name already exists.")
+        return value
+    
+    def validate_display_order(self, value):
+        if not value:
+            return value
+        if self.instance:
+            if self.instance.display_order == value:
+                return value
+        if Brand.objects.filter(display_order=value).exists():
+            raise serializers.ValidationError(f"Brand with this display order {value} already exists.")
         return value
             
     
@@ -134,22 +155,22 @@ class BrandSerializer(serializers.Serializer):
 
     def update(self, instance, validated_data):
         instance.name = validated_data.get('name', instance.name)
-        instance.slug = validated_data.get('slug', instance.slug)
-        instance.icon = validated_data.get('icon', instance.icon)
+        instance.logo = validated_data.get('logo', instance.logo)
         instance.display_order = validated_data.get('display_order', instance.display_order)
+        instance.is_active = validated_data.get('is_active', instance.is_active)
         instance.updated_at = timezone.now()
-        instance.save(update_fields=['name', 'slug', 'icon', 'display_order', 'updated_at'])
+        instance.save()
         return instance
     
 class BrandSerializerForView(serializers.ModelSerializer):
     class Meta:
         model = Brand
-        fields = ['id', 'name', 'slug', 'icon', 'display_order']
+        fields = ['id', 'name', 'slug', 'logo', 'display_order']
 
 
 class BrandDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = Brand
         fields = '__all__'
-        depth = 1
+       
     
