@@ -22,8 +22,8 @@ class CommissionRate(models.Model):
 class Store(StoreBaseModel):
     """Store/Shop model for vendors and companies"""
     
-    store_owner = models.ForeignKey(StoreOwner, on_delete=models.CASCADE, related_name='stores',null=True,blank=True)
-    vendor = models.ForeignKey(Vendor, on_delete=models.CASCADE, related_name='vendors',null=True,blank=True)
+    store_owner = models.ForeignKey(StoreOwner, on_delete=models.CASCADE, related_name='store_owner_stores',null=True,blank=True)
+    vendor = models.ForeignKey(Vendor, on_delete=models.CASCADE, related_name='vendor_stores',null=True,blank=True)
     store_name = models.CharField(max_length=255, unique=True,default='')
     slug = models.SlugField(max_length=255, unique=True)
     type = models.CharField(max_length=20, choices=TYPE_CHOICES,default='company')
@@ -31,7 +31,6 @@ class Store(StoreBaseModel):
     banner = models.ImageField(upload_to='store_banners/', blank=True, null=True)
     address = models.CharField(max_length=255,default='')
     description = models.TextField(default='')
-    commission_rate = models.ForeignKey(CommissionRate, on_delete=models.SET_NULL, null=True, blank=True)
     is_verified = models.BooleanField(default=False)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     
@@ -39,6 +38,10 @@ class Store(StoreBaseModel):
     def save(self, *args, **kwargs):
         if not self.slug:
             self.slug = slugify(self.store_name)
+        
+        if not self.store_owner and not self.vendor:
+            raise ValueError("Either store_owner or vendor must be set to create a store object")
+        
         super().save(*args, **kwargs)
     
     def __str__(self):

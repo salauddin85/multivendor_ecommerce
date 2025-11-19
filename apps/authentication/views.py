@@ -57,7 +57,10 @@ class LoginLogoutView(APIView):
                 return Response({
                     "code": 401,
                     "status": "failed",
-                    "message": "Invalid email or password"
+                    "message": "Invalid email or password",
+                    "data" : {
+                        "not_found": ["Invalid email or password."]
+                    }
                 }, status=status.HTTP_401_UNAUTHORIZED)
 
             # Generate tokens

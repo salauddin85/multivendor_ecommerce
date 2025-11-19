@@ -76,6 +76,7 @@ class Vendor(models.Model):
     product_image = models.ImageField(upload_to='vendor/product_images/', blank=True, null=True) 
     trade_license = models.ImageField(upload_to='vendor/trade_license/', blank=True, null=True)  
     status = models.CharField(max_length=50, choices=USER_STATUS_CHOICES, default="pending")  
+    
     def __str__(self):
         return f"Vendor: {self.user.email}"
 

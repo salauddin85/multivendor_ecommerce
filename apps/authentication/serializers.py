@@ -14,6 +14,9 @@ from django.contrib.auth.password_validation import validate_password
 from .validators import SimplePasswordValidator
 from django.core.exceptions import ValidationError
 import phonenumbers
+from apps.stores.models import Store
+from django.db import transaction
+
 
 
 class LoginSerializer(serializers.Serializer):
@@ -86,7 +89,6 @@ class CommonRegisterOtpVerifySerializer(serializers.Serializer):
                 {'otp': [f"OTP {otp} has expired. Please request a new one."]})
         return super().validate(attrs)
 
-    
 class RegistrationVendorSerializer(serializers.Serializer):
     email = serializers.EmailField()
     password = serializers.CharField(write_only=True)
@@ -98,47 +100,97 @@ class RegistrationVendorSerializer(serializers.Serializer):
     product_details = serializers.CharField()
     product_image = serializers.ImageField()
     trade_license = serializers.ImageField()
-    
+    store_name = serializers.CharField()
+
+    # ---------------------------
+    # FIELD VALIDATION
+    # ---------------------------
+
     def validate_email(self, value):
         if CustomUser.objects.filter(email=value).exists():
-            raise serializers.ValidationError(f"Email {value} is already in use in the system. Please use a different email.")
-        verify_success = models.RegisterVerificationSuccessfulEmail.objects.filter(
-            email=value).exists()
-        if not verify_success:
-            raise serializers.ValidationError(f"Email {value} is not verified. Please verify your email before registration.")
+            raise serializers.ValidationError(
+                f"Email '{value}' is already in use. Please use another one."
+            )
+
+        if not models.RegisterVerificationSuccessfulEmail.objects.filter(email=value).exists():
+            raise serializers.ValidationError(
+                f"Email '{value}' is not verified. Please verify before registration."
+            )
         return value
-    
+
     def validate_phone_number(self, value):
         try:
             phone = phonenumbers.parse(value, None)
             if not phonenumbers.is_valid_number(phone):
                 raise serializers.ValidationError("Invalid phone number.")
         except phonenumbers.NumberParseException:
-            raise serializers.ValidationError("Invalid phone number format. Use +<countrycode><number>.")
-        
+            raise serializers.ValidationError(
+                "Invalid phone number format. Use +<countrycode><number>."
+            )
         return phonenumbers.format_number(phone, phonenumbers.PhoneNumberFormat.E164)
-    
-    
+
     def validate_password(self, value):
         SimplePasswordValidator().validate(value)
         return value
-    
-    def create(self, validated_data):
-        email = validated_data.get("email")
-        password = validated_data.get("password")
-        first_name = validated_data.get("first_name")
-        last_name = validated_data.get("last_name")
-        phone_number = validated_data.get("phone_number")
-        address = validated_data.get("address")
-        nid_card_pic = validated_data.get("nid_card_pic")
-        product_details = validated_data.get("product_details")
-        product_image = validated_data.get("product_image")
-        trade_license = validated_data.get("trade_license")
 
-        user = CustomUser.objects.create_user(email=email, password=password, first_name=first_name, last_name=last_name, user_type='vendor')
-        models.Vendor.objects.create(user=user, phone_number=phone_number, address=address, nid_card_pic=nid_card_pic, product_details=product_details, product_image=product_image, trade_license=trade_license)
-        user.save()
-        return user
+    def validate_store_name(self, value):
+        if Store.objects.filter(store_name=value).exists():
+            raise serializers.ValidationError(
+                f"Store name '{value}' already exists. Try another one."
+            )
+        return value
+
+
+    @transaction.atomic
+    def create(self, validated_data):
+        try:
+            # Extract data
+            email = validated_data["email"]
+            password = validated_data["password"]
+            first_name = validated_data["first_name"]
+            last_name = validated_data["last_name"]
+            phone_number = validated_data["phone_number"]
+            address = validated_data["address"]
+            nid_card_pic = validated_data["nid_card_pic"]
+            product_details = validated_data["product_details"]
+            product_image = validated_data["product_image"]
+            trade_license = validated_data["trade_license"]
+            store_name = validated_data["store_name"]
+
+            #  Create User
+            user = CustomUser.objects.create_user(
+                email=email,
+                password=password,
+                first_name=first_name,
+                last_name=last_name,
+                user_type='vendor'
+            )
+
+            #  Create Vendor Profile
+            vendor = models.Vendor.objects.create(
+                user=user,
+                phone_number=phone_number,
+                address=address,
+                nid_card_pic=nid_card_pic,
+                product_details=product_details,
+                product_image=product_image,
+                trade_license=trade_license,
+            )
+
+            #  Create Store (MUST for vendor)
+            store = Store.objects.create(
+                store_name=store_name,
+                store_owner=None,      
+                vendor=vendor,          
+                type='vendor'
+            )
+
+            return user
+
+        except Exception as e:
+            raise serializers.ValidationError(
+                f"vendor : {str(e)}"
+            )
 
 
 class RegistrationStoreOwnerSerializer(serializers.Serializer):
@@ -151,46 +203,89 @@ class RegistrationStoreOwnerSerializer(serializers.Serializer):
     nid_card_image = serializers.ImageField()
     store_details = serializers.CharField()
     trade_license = serializers.ImageField()
-    
-    
+    store_name = serializers.CharField()
+
+    # ---------------- VALIDATION ---------------- #
+
     def validate_email(self, value):
         if CustomUser.objects.filter(email=value).exists():
-            raise serializers.ValidationError(f"Email {value} is already in use in the system. Please use a different email.")
-        verify_success = models.RegisterVerificationSuccessfulEmail.objects.filter(
-            email=value).exists()
-        if not verify_success:
-            raise serializers.ValidationError(f"Email {value} is not verified. Please verify your email before registration.")
+            raise serializers.ValidationError(
+                f"Email {value} is already in use. Please use a different email."
+            )
+
+        if not models.RegisterVerificationSuccessfulEmail.objects.filter(email=value).exists():
+            raise serializers.ValidationError(
+                f"Email {value} is not verified. Please verify first."
+            )
         return value
-    
+
     def validate_phone_number(self, value):
         try:
             phone = phonenumbers.parse(value, None)
             if not phonenumbers.is_valid_number(phone):
                 raise serializers.ValidationError("Invalid phone number.")
         except phonenumbers.NumberParseException:
-            raise serializers.ValidationError("Invalid phone number format. Use +<countrycode><number>.")
-        
+            raise serializers.ValidationError("Invalid phone number format.")
+
         return phonenumbers.format_number(phone, phonenumbers.PhoneNumberFormat.E164)
-    
+
     def validate_password(self, value):
         SimplePasswordValidator().validate(value)
         return value
-    
-    def create(self, validated_data):
-        email = validated_data.get("email")
-        password = validated_data.get("password")
-        first_name = validated_data.get("first_name")
-        last_name = validated_data.get("last_name")
-        phone_number = validated_data.get("phone_number")
-        address = validated_data.get("address")
-        nid_card_image = validated_data.get("nid_card_image")
-        store_details = validated_data.get("store_details")
-        trade_license = validated_data.get("trade_license")
 
-        user = CustomUser.objects.create_user(email=email, password=password, first_name=first_name, last_name=last_name, user_type='store_owner')
-        models.StoreOwner.objects.create(user=user, phone_number=phone_number, address=address, nid_card_image=nid_card_image, store_details=store_details, trade_license=trade_license)
-        user.save()
-        return user
+    def validate_store_name(self, value):
+        if Store.objects.filter(store_name=value).exists():
+            raise serializers.ValidationError(
+                f"Store name '{value}' already exists. Try another one."
+            )
+        return value
+
+
+    @transaction.atomic  #  FULL ROLLBACK if one step fails
+    def create(self, validated_data):
+        try:
+            # Extract fields
+            email = validated_data["email"]
+            password = validated_data["password"]
+            first_name = validated_data["first_name"]
+            last_name = validated_data["last_name"]
+            phone_number = validated_data["phone_number"]
+            address = validated_data["address"]
+            nid_card_image = validated_data["nid_card_image"]
+            store_details = validated_data["store_details"]
+            trade_license = validated_data["trade_license"]
+            store_name = validated_data["store_name"]
+
+            # Step 1: Create User
+            user = CustomUser.objects.create_user(
+                email=email,
+                password=password,
+                first_name=first_name,
+                last_name=last_name,
+                user_type='store_owner'
+            )
+
+            # Step 2: Create Store Owner
+            store_owner = models.StoreOwner.objects.create(
+                user=user,
+                phone_number=phone_number,
+                address=address,
+                nid_card_image=nid_card_image,
+                store_details=store_details,
+                trade_license=trade_license,
+            )
+
+            # Step 3: Create Store
+            Store.objects.create(
+                store_name=store_name,
+                store_owner=store_owner,
+                type='company'
+            )
+
+            return user
+
+        except Exception as e:
+            raise serializers.ValidationError({"store_owner": str(e)})
 
 
 class RegistrationCustomerSerializer(serializers.Serializer):

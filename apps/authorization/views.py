@@ -903,6 +903,53 @@ class ViewSingleUserRolesPermissionsView(APIView):
                 'errors': {
                     'server_error': [str(e)]
                 }}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+   
+   
+
+
+class RoleDetailsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, id):
+        try:
+            role = models.Role.objects.prefetch_related(
+                "permissions").get(id=id)
+            
+            # Serialize role details
+            role_serializer = serializers.RoleSerializerForView(role)
+
+            # Get users assigned to this role
+            assigned_roles = models.AssignRole.objects.filter(roles=role).select_related('user')
+            users = [ar.user for ar in assigned_roles if ar.user]
+            user_serializer = serializers.UserSerializer(users, many=True)
+
+            log_request(request, "Role details fetched", "info",
+                        f"Details for role '{role.name}' fetched successfully", response_status_code=status.HTTP_200_OK)
+            return Response({
+                "code": 200,
+                "status": "success",
+                "data": {
+                    "role": role_serializer.data,
+                    "users": user_serializer.data
+                }
+            }, status=status.HTTP_200_OK)
+
+        except models.Role.DoesNotExist:
+            return Response({"code": status.HTTP_404_NOT_FOUND, "message": "Role not found", "status": "failed"}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            logger.exception(str(e))
+            log_request(request, "Role details fetch failed", "error",
+                        f"Role details fetch failed due to server error: {str(e)}", response_status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({
+                "code": status.HTTP_500_INTERNAL_SERVER_ERROR,
+                "message": "Invalid request",
+                "status": "failed",
+                "errors": {
+                    'server_error': [str(e)]
+                }}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+
             
 
 class AllStaffListView (APIView):
@@ -911,9 +958,12 @@ class AllStaffListView (APIView):
     def get(self, request):
         try:
             staff_members = Staff.objects.select_related('user', 'store_owner').all()
+            paginator = CustomPageNumberPagination()
+            paginated_queryset = paginator.paginate_queryset(
+                staff_members, request, view=self)
             serializer = serializers.StaffSerializer(staff_members, many=True)
             log_request(request, "Fetched all staff members", "info", "All staff members fetched successfully", response_status_code=status.HTTP_200_OK)
-            return Response({
+            return paginator.get_paginated_response({
                 "code": status.HTTP_200_OK,
                 "message": "All staff members fetched successfully",
                 "status": "success",
@@ -937,9 +987,12 @@ class AllVendorListView (APIView):
     def get(self, request):
         try:
             vendors = Vendor.objects.select_related('user').all()
-            serializer = serializers.VendorSerializer(vendors, many=True)
+            paginator = CustomPageNumberPagination()
+            paginated_queryset = paginator.paginate_queryset(
+                vendors, request, view=self)
+            serializer = serializers.VendorSerializer(paginated_queryset, many=True)
             log_request(request, "Fetched all vendors", "info", "All vendors fetched successfully", response_status_code=status.HTTP_200_OK)
-            return Response({
+            return paginator.get_paginated_response({
                 "code": status.HTTP_200_OK,
                 "message": "All vendors fetched successfully",
                 "status": "success",
@@ -962,9 +1015,12 @@ class AllCustomerListView (APIView):
     def get(self, request):
         try:
             customers = Customer.objects.select_related('user').all()
-            serializer = serializers.CustomerSerializer(customers, many=True)
+            paginator = CustomPageNumberPagination()
+            paginated_queryset = paginator.paginate_queryset(
+                customers, request, view=self)
+            serializer = serializers.CustomerSerializer(paginated_queryset, many=True)
             log_request(request, "Fetched all customers", "info", "All customers fetched successfully", response_status_code=status.HTTP_200_OK)
-            return Response({
+            return paginator.get_paginated_response({
                 "code": status.HTTP_200_OK,
                 "message": "All customers fetched successfully",
                 "status": "success",
@@ -987,9 +1043,12 @@ class AllStoreOwnerListView (APIView):
     def get(self, request):
         try:
             store_owners = StoreOwner.objects.select_related('user').all()
+            paginator = CustomPageNumberPagination()
+            paginated_queryset = paginator.paginate_queryset(
+                store_owners, request, view=self)
             serializer = serializers.StoreOwnerSerializer(store_owners, many=True)
             log_request(request, "Fetched all store owners", "info", "All store owners fetched successfully", response_status_code=status.HTTP_200_OK)
-            return Response({
+            return paginator.get_paginated_response({
                 "code": status.HTTP_200_OK,
                 "message": "All store owners fetched successfully",
                 "status": "success",

@@ -8,6 +8,8 @@ urlpatterns = [
          name="permission_detail_view"),
     path('v1/role_permissions/', views.RolePermissionView.as_view(),
          name="role_permission_view"),
+    path('v1/role_permissions/<int:id>/', views.RoleDetailsView.as_view(),
+         name="role_details_view"),
     path('v1/role_permissions/data/',
          views.RolePermissionViewV2.as_view(), name="role_permissions"),
     path('v1/single_role_permissions/<int:role_id>/',
