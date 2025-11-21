@@ -64,14 +64,14 @@ class ProductAttribute(ProductBaseModel):
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="attributes",db_index=True)
     name = models.CharField(max_length=100)
     is_variation = models.BooleanField(default=True)
-
+    
     class Meta:
         constraints = [
             models.UniqueConstraint(fields=['product', 'name'], name='unique_product_attribute')
         ]
 
     def __str__(self):
-        return f"{self.name} ({self.product.title})"
+        return f"{self.name}"
 
 
 # Product Attribute Values

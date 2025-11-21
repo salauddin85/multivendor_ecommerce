@@ -3,6 +3,7 @@ from . import models
 from apps.stores.models import Store
 from apps.catalog.models import Category, Brand
 from django.db import transaction
+import re
 
 
 
@@ -103,7 +104,7 @@ class ProductSerializer(serializers.Serializer):
                 instance.images.all().delete()
                 # Create new gallery images
                 for image_data in gallery_images_data:
-                    models.ProductImage.objects.create(product=instance, image=image_data['image'])
+                    models.ProductImage.objects.create(product=instance, image=image_data)
             
             return instance
 
@@ -131,6 +132,44 @@ class ProductSerializerView(DynamicFieldsModelSerializer):
     
     class Meta:
         model = models.Product
-        fields = ['id', 'store', 'category', 'brand', 'title', 'type', 'description', 'base_price', 'main_image', 'stock', 'is_featured', 'status']
+        fields = ['id','slug', 'store', 'category', 'brand', 'title', 'type', 'description', 'base_price', 'main_image', 'stock', 'is_featured', 'status']
     
     
+class ProductDetailSerializer(serializers.ModelSerializer):
+    images = ProductImageSerializerView(many=True, read_only=True)
+    class Meta:
+        model = models.Product
+        fields = '__all__'
+        depth = 1
+        
+
+class ProductAttributeSerializer(serializers.Serializer):
+    name = serializers.CharField()
+    product = serializers.PrimaryKeyRelatedField(queryset=models.Product.objects.all())
+    is_variation = serializers.BooleanField(default=False)
+
+    def validate_name(self, value):
+        value = value.strip()
+        value = re.sub(r'[^\w\s]', '', value)     
+        value = re.sub(r'\s+', '_', value)       
+        value = value.lower()
+        return value.strip('_')
+    
+    def create(self, validated_data):
+        product_attribute = models.ProductAttribute.objects.create(**validated_data)
+        return product_attribute
+    
+    def update(self, instance, validated_data):
+        instance.name = validated_data.get('name', instance.name)
+        instance.product = validated_data.get('product', instance.product)
+        instance.is_variation = validated_data.get('is_variation', instance.is_variation)
+        instance.save()
+        return instance
+
+
+class ProductAttributeSerializerView(serializers.ModelSerializer):
+    product = serializers.StringRelatedField()
+    class Meta:
+        model = models.ProductAttribute
+        fields = '__all__'
+        depth = 1
