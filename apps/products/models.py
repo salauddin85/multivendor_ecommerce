@@ -79,6 +79,11 @@ class ProductAttributeValue(ProductBaseModel):
     attribute = models.ForeignKey(ProductAttribute, on_delete=models.CASCADE, related_name="values",db_index=True)
     value = models.CharField(max_length=100)
     color_code = models.CharField(max_length=20, blank=True, default='')
+    
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['attribute', 'value'], name='unique_attribute_value')
+        ]
 
     def __str__(self):
         return f"{self.value} ({self.attribute.name})"

@@ -360,7 +360,6 @@ class RolePermissionViewV2(APIView):
 
 
 
-
 class SpecificRolePermissionView(APIView):
     permission_classes = [IsAuthenticated]
 
