@@ -32,6 +32,9 @@ class Category(CatalogBaseModel):
             self.slug = slug
         super().save(*args, **kwargs)
 
+    def __str__(self):
+        return self.name
+    
 
 class Brand(CatalogBaseModel):
 
@@ -50,7 +53,10 @@ class Brand(CatalogBaseModel):
                 counter += 1
             self.slug = slug
         super().save(*args, **kwargs)
-        
+    
+    def __str__(self):
+        return self.name
+    
 
 class CategoryAnalytics(CatalogBaseModel):
     category = models.OneToOneField(Category, on_delete=models.CASCADE, related_name='analytics')
@@ -59,6 +65,9 @@ class CategoryAnalytics(CatalogBaseModel):
     total_sold = models.IntegerField(default=0)                # how many products sold for this type of category
     avg_rating = models.DecimalField(max_digits=3, decimal_places=2, default=0.00)  # category rating
     top_product_id = models.IntegerField(null=True, blank=True)  # most of sold type of product
+
+    def __str__(self):
+        return self.category.name
 
 
 class BrandAnalytics(CatalogBaseModel):
@@ -69,4 +78,6 @@ class BrandAnalytics(CatalogBaseModel):
     avg_rating = models.DecimalField(max_digits=3, decimal_places=2, default=0.00)  # average rating
     top_product_id = models.IntegerField(null=True, blank=True)  # top selling product
 
+    def __str__(self):
+        return self.brand.name
 

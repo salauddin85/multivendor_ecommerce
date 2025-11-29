@@ -24,6 +24,7 @@ from apps.authorization.tasks import send_otp_email
 from apps.authorization.models import OTP, VerifySuccessfulEmail
 from apps.authentication.tasks import send_register_confirmation_email, send_otp_mail_to_email
 from apps.authentication.utils.function import generate_random_token
+from apps.cart.services.cart_manage import merge_guest_cart_to_user_cart
 
 
 class LoginLogoutView(APIView):
@@ -68,6 +69,8 @@ class LoginLogoutView(APIView):
             access_token = str(refresh.access_token)
             refresh_token = str(refresh)
             user_type = user.user_type
+            if user_type == 'customer':
+                merge_guest_cart_to_user_cart(request, user)
 
             # Build response
             response = Response({

@@ -127,18 +127,38 @@ class ProductImageSerializerForProduct(serializers.ModelSerializer):
 class ProductSerializerView(DynamicFieldsModelSerializer):
     store = serializers.StringRelatedField()
     # images = ProductImageSerializerForProduct(many=True, read_only=True)
-    brand = BrandSerializerForProduct(read_only=True)
-    category = CategorySerializerForProduct(read_only=True)
+    brand = serializers.StringRelatedField(source = 'brand.name')
+    category = serializers.StringRelatedField(source = 'category.name')
     
     class Meta:
         model = models.Product
         fields = ['id','slug', 'store', 'category', 'brand', 'title', 'type', 'description', 'base_price', 'main_image', 'stock', 'is_featured', 'status']
-    
+
+
+class ProductStoreForProductDetailsSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Store
+        fields = ['id', 'store_name', 'slug']
+
+        
     
 class ProductDetailSerializer(serializers.ModelSerializer):
     images = ProductImageSerializerView(many=True, read_only=True)
-    # attributes = serializers.SerializerMethodField()
-    # variants = serializers.SerializerMethodField()
+    attributes = serializers.SerializerMethodField()
+    variants = serializers.SerializerMethodField()
+    brand = BrandSerializerForProduct()
+    category = CategorySerializerForProduct()
+    store = ProductStoreForProductDetailsSerializer()
+
+    def get_attributes(self, obj):
+        attributes = models.ProductAttribute.objects.filter(product=obj)
+        return ProductAttributeSerializer(attributes, many=True).data
+
+    def get_variants(self, obj):
+        variants = models.ProductVariant.objects.filter(product=obj)
+        return ProductVariantSerializer(variants, many=True).data
+    
+
     class Meta:
         model = models.Product
         fields = '__all__'
