@@ -6,7 +6,7 @@ from apps.orders.models import Order, OrderItem, ShippingAddress
 from django.db import transaction
 from decimal import Decimal
 import uuid
-from utils.order_number_generate import _generate_order_number
+# from utils.order_number_generate import generate_order_number
 
 
 
