@@ -19,8 +19,8 @@ from django.urls import path, include
 
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
-    path('silk/', include('silk.urls', namespace='silk')),
+    path('api/admin/', admin.site.urls),
+    path('api/silk/', include('silk.urls', namespace='silk')),
     path('api/authentication/', include('apps.authentication.urls')),
     path('api/authorization/', include('apps.authorization.urls')),
     path('api/catalog/', include('apps.catalog.urls')),
@@ -31,6 +31,8 @@ urlpatterns = [
     # path('api/payments/',include('apps.payments.urls')),
     path('api/blogs/',include('apps.blogs.urls')),
     path('api/notifications/',include('apps.notifications.urls')),
+    path('api/wishlist/',include('apps.wishlist.urls')),
+   
 
 
 
