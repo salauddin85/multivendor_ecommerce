@@ -63,8 +63,8 @@ class ShippingAddressView(APIView):
     # Get All Shipping Addresses
     def get(self, request):
         try:
-            shipping_addresses = models.ShippingAddress.objects.filter(user=request.user)
-            serializer = serializers.ShippingAddressSerializer(shipping_addresses, many=True)
+            shipping_addresses = models.ShippingAddress.objects.filter(user = request.user)
+            serializer = serializers.ShippingAddressSerializerForView(shipping_addresses, many=True)
 
             return Response(
                 {
@@ -93,10 +93,9 @@ class ShippingAddressDetailView(APIView):
 
     def get(self, request, pk):
         try:
-            log_request(request)
-
+            
             shipping_address = models.ShippingAddress.objects.get(pk=pk, user=request.user)
-            serializer = serializers.ShippingAddressSerializer(shipping_address)
+            serializer = serializers.ShippingAddressSerializerForView(shipping_address)
 
             return Response(
                 {
@@ -114,6 +113,9 @@ class ShippingAddressDetailView(APIView):
                     "code": status.HTTP_404_NOT_FOUND,
                     "status": "failed",
                     "message": "Shipping address not found.",
+                    "errors": {
+                        "shipping_address_id": f"Shipping address not found for id {pk}."
+                    }
                 },
                 status=status.HTTP_404_NOT_FOUND,
             )
@@ -131,7 +133,48 @@ class ShippingAddressDetailView(APIView):
                 },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+    
+    def delete(self, request, pk):
+        try:
+            try:
+                shipping_address = models.ShippingAddress.objects.get(pk=pk, user=request.user)
+            except models.ShippingAddress.DoesNotExist:
+                return Response(
+                    {
+                        "code": status.HTTP_404_NOT_FOUND,
+                        "status": "failed",
+                        "message": "Shipping address not found.",
+                        "errors": {
+                            "shipping_address_id": "Shipping address not found."
+                        }
+                    },
+                    status=status.HTTP_404_NOT_FOUND,
+                )
 
+            shipping_address.delete()
+
+            return Response(
+                {
+                    "code": status.HTTP_204_NO_CONTENT,
+                    "status": "success",
+                    "message": "Shipping address deleted successfully.",
+                },
+                status=status.HTTP_204_NO_CONTENT,
+            )
+
+        except Exception as e:
+            logger.exception("Error deleting shipping address.")
+            return Response(
+                {
+                    "code": status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    "status": "failed",
+                    "message": "An error occurred while deleting shipping address.",
+                    "errors": {"server_error": [str(e)]},
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    
 
 class OrderView(APIView):
     permission_classes = [IsAuthenticated]
@@ -180,6 +223,41 @@ class OrderView(APIView):
                 },
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
     )
+    
+    def get(self, request):
+        try:
+            paginator = CustomPageNumberPagination()
+            # Only logged-in user orders
+            orders = models.Order.objects.filter(user=request.user).order_by("-created_at")
+
+            # Paginate
+            paginated_orders = paginator.paginate_queryset(orders, request)
+
+            serializer = serializers.OrderSerializerView(
+                paginated_orders, many=True
+            )
+
+            return paginator.get_paginated_response(
+                {
+                    "code": status.HTTP_200_OK,
+                    "status": "success",
+                    "message": "Orders retrieved successfully.",
+                    "data": serializer.data,
+                }
+            )
+
+        except Exception as e:
+            logger.exception(str(e))
+            return Response(
+                {
+                    "code": status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    "status": "failed",
+                    "message": "An error occurred while retrieving orders.",
+                    "errors": {"server_error": [str(e)]},
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
             
 
 class OrderDetailView(APIView):
@@ -187,7 +265,7 @@ class OrderDetailView(APIView):
 
     def get(self, request, pk):
         try:
-            order = models.Order.objects.select_related('user','store', 'shipping_address','parent').get(pk=pk, user=request.user)
+            order = models.Order.objects.select_related('user','shipping_address','parent').get(pk=pk, user=request.user)
             serializer = serializers.OrderDetailSerializerView(order)
             return Response(  {
                 "code": status.HTTP_200_OK,
@@ -222,7 +300,7 @@ class OrderListView(APIView):
 
     def get(self, request):
         try:
-            orders = models.Order.objects.select_related('user','store', 'shipping_address','parent').filter(user=request.user)
+            orders = models.Order.objects.select_related('user','shipping_address','parent').filter(user=request.user)
             paginator = CustomPageNumberPagination()
             result_page = paginator.paginate_queryset(orders, request)
             serializer = serializers.OrderSerializerView(result_page, many=True)

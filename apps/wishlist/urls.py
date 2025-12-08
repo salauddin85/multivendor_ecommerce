@@ -9,7 +9,8 @@ from .views import (
 
 urlpatterns = [
     path("v1/wishlists/", WishlistView.as_view()),
-    path("v1/wishlists/<int:pk>/", WishlistDetailView.as_view()),
     path("v1/wishlists/<int:pk>/items/", WishlistItemView.as_view()),
     path("v1/wishlists/<int:pk>/items/<int:item_id>/", WishlistItemDeleteView.as_view()),
+    path("v1/wishlists/<int:pk>/", WishlistDetailView.as_view()),
+
 ]

@@ -30,12 +30,17 @@ class WishlistItemCreateSerializer(serializers.Serializer):
     def validate(self, attrs):
         product_id = attrs.get('product_id')
         variant_id = attrs.get('variant_id')
+        wishlist = self.context['wishlist']
+
 
         if not Product.objects.filter(id=product_id).exists():
             raise serializers.ValidationError({"product_id": ["Invalid product"]})
 
         if variant_id and not ProductVariant.objects.filter(id=variant_id).exists():
             raise serializers.ValidationError({"variant_id": ["Invalid variant"]})
+        
+        if WishlistItem.objects.filter(wishlist=wishlist, product_id=product_id, variant_id=variant_id).exists():
+            raise serializers.ValidationError("Item already exists in wishlist")
 
         return attrs
 
@@ -56,8 +61,11 @@ class WishlistItemCreateSerializer(serializers.Serializer):
 
 
 class WishlistItemSerializer(serializers.ModelSerializer):
-    product_name = serializers.CharField(source='product.title', read_only=True)
+    # product_name = serializers.CharField(source='product.title', read_only=True)
 
     class Meta:
         model = WishlistItem
-        fields = ['id', 'product_name', 'product', 'variant', 'created_at']
+        fields = ['id', 'product', 'variant', 'created_at']
+        depth = 1
+
+

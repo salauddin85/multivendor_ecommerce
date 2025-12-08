@@ -102,7 +102,6 @@ class SubscriberView(APIView):
     def post(self, request):
         try:
             data = request.data
-            user = request.user
             serializer = serializers.SubscriberSerializer(data=data, context={'request': request})
             if serializer.is_valid():
                 subscriber = serializer.save()

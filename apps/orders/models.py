@@ -7,7 +7,18 @@ from apps.products.models import Product, ProductVariant
 from .constants.choices import STATUS_CHOICES, PAYMENT_STATUS_CHOICES,ORDER_TYPE_CHOICES
 
 
-class ShippingAddress(models.Model):
+
+
+
+class OrderBaseModel(models.Model):
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        abstract = True
+        
+
+class ShippingAddress(OrderBaseModel):
     """User addresses"""
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='addresses',null=True, blank=True)
     name = models.CharField(max_length=255)
@@ -24,21 +35,11 @@ class ShippingAddress(models.Model):
         return self.name
 
 
-
-class OrderBaseModel(models.Model):
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    
-    class Meta:
-        abstract = True
-
-
 class Order(OrderBaseModel):
     """Orders"""
     
     order_number = models.CharField(max_length=50, unique=True)
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='orders',null=True, blank=True)
-    store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name='orders', null=True, blank=True)
     parent = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='sub_orders')
     subtotal = models.DecimalField(max_digits=10, decimal_places=2)
     shipping_fee = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)

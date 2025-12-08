@@ -99,9 +99,9 @@ def flush_activity_logs():
 
     for log in logs:
         user = None
-        if log.get("user_id"):
+        if log.get("user"):
             try:
-                user = User.objects.get(id=log["user_id"])
+                user = User.objects.get(id=log["user"])
             except User.DoesNotExist:
                 pass
 

@@ -6,19 +6,58 @@ from apps.orders.models import Order, OrderItem, ShippingAddress
 from django.db import transaction
 from decimal import Decimal
 import uuid
+import phonenumbers
+
 # from utils.order_number_generate import generate_order_number
 
 
+class ShippingAddressSerializer(serializers.Serializer):
+    """Serializer for Creating & Updating Shipping Address"""
+
+    name = serializers.CharField(max_length=255)
+    phone = serializers.CharField(max_length=20)
+    address_line = serializers.CharField()
+    city = serializers.CharField(max_length=100)
+    state = serializers.CharField(max_length=100)
+    country = serializers.CharField(max_length=100)
+    postal_code = serializers.CharField(max_length=20)
+    type = serializers.CharField(max_length=20)
+    is_default = serializers.BooleanField(required=False, default=False)
+
+    # ------------------------------
+    #       FIELD VALIDATION
+    # ------------------------------
+
+    def validate_phone_number(self, value):
+        try:
+            phone = phonenumbers.parse(value, None)
+            if not phonenumbers.is_valid_number(phone):
+                raise serializers.ValidationError("Invalid phone number.")
+        except phonenumbers.NumberParseException:
+            raise serializers.ValidationError(
+                "Invalid phone number format. Use +<countrycode><number>."
+            )
+        return phonenumbers.format_number(phone, phonenumbers.PhoneNumberFormat.E164)
 
 
+    def validate_postal_code(self, value):
+        if len(value) < 3:
+            raise serializers.ValidationError("Postal code is too short.")
+        return value
 
 
+    def create(self, validated_data):
+        user = validated_data.pop("user")
+        return ShippingAddress.objects.create(user=user, **validated_data)
 
-class ShippingAddressSerializer(serializers.ModelSerializer):
+    
+
+class ShippingAddressSerializerForView(serializers.ModelSerializer):
+    user = serializers.StringRelatedField()
+    
     class Meta:
         model = models.ShippingAddress
         fields = '__all__'
-        read_only_fields = ('user')
 
 
 class OrderItemInputSerializer(serializers.Serializer):
@@ -34,7 +73,7 @@ class OrderItemInputSerializer(serializers.Serializer):
         # check variant belongs to product
         if variant.product_id != data["product"].id:
             raise serializers.ValidationError(
-                {"variant": "This variant does not belong to this product."}
+                {"variant": f"This variant {variant.id} does not belong to this product."}
             )
 
         # check stock
@@ -50,7 +89,7 @@ class OrderSerializer(serializers.Serializer):
     shipping_address = serializers.PrimaryKeyRelatedField(
         queryset=ShippingAddress.objects.all()
     )
-    payment_method = serializers.CharField()
+    # payment_method = serializers.CharField()
     customer_note = serializers.CharField(required=False, allow_blank=True)
     items = OrderItemInputSerializer(many=True)
 
@@ -86,13 +125,12 @@ class OrderSerializer(serializers.Serializer):
         order = Order.objects.create(
             order_number=order_number,
             user=request.user,
-            store=None,
             subtotal=subtotal,
             shipping_fee=shipping_fee,
             tax=tax,
             discount=discount,
             total_amount=total_amount,
-            payment_method=validated_data.get("payment_method"),
+            # payment_method=validated_data.get("payment_method"),
             shipping_address=validated_data.get("shipping_address"),
             customer_note=validated_data.get("customer_note", "")
         )
@@ -129,12 +167,20 @@ class OrderSerializerView(serializers.ModelSerializer):
     class Meta:
         model = models.Order
         fields = '__all__'
+
+class OrderItemSerializerView(serializers.ModelSerializer):
+    class Meta:
+        model = models.OrderItem
+        fields = '__all__'
         
 
 class OrderDetailSerializerView(serializers.ModelSerializer):
+    items = OrderItemSerializerView(many=True)
+    # shipping_address = ShippingAddressSerializerForView()
+    
     class Meta:
         model = models.Order
         fields = '__all__'
-        depth = 1
+        # depth = 1
         
 
