@@ -7,6 +7,9 @@ from django.db import transaction
 from decimal import Decimal
 import uuid
 import phonenumbers
+from apps.coupons.models import Coupon, CouponUsage
+from django.utils import timezone
+
 
 # from utils.order_number_generate import generate_order_number
 
@@ -92,36 +95,79 @@ class OrderSerializer(serializers.Serializer):
     # payment_method = serializers.CharField()
     customer_note = serializers.CharField(required=False, allow_blank=True)
     items = OrderItemInputSerializer(many=True)
+    coupon_code = serializers.CharField(required=False, allow_blank=True)
+    
+
 
     def validate_shipping_address(self, value):
         request = self.context["request"]
         if value.user != request.user:
             raise serializers.ValidationError("This address does not belong to you.")
         return value
+    
 
     @transaction.atomic
     def create(self, validated_data):
         request = self.context["request"]
 
         items_data = validated_data.pop("items")
+        coupon_code = validated_data.pop("coupon_code", "").strip()
 
-        # Calculate totals
         subtotal = Decimal("0.00")
 
         for item in items_data:
             variant = item["variant"]
             price = variant.discount_price or variant.price
-            subtotal += (price * item["quantity"])
+            subtotal += price * item["quantity"]
 
-        shipping_fee = Decimal("50.00") 
+        shipping_fee = Decimal("50.00")
         tax = Decimal("0.00")
         discount = Decimal("0.00")
+        applied_coupon = None
+
+        # =========================
+        # COUPON VALIDATION LOGIC
+        # =========================
+        if coupon_code:
+            now = timezone.now()
+
+            coupon = Coupon.objects.select_for_update().filter(
+                code=coupon_code,
+                status="active",
+                valid_from__lte=now,
+                valid_to__gte=now
+            ).first()
+
+            if not coupon:
+                raise serializers.ValidationError({
+                    "coupon_code": "Invalid or expired coupon"
+                })
+
+            if subtotal < coupon.min_order_amount:
+                raise serializers.ValidationError({
+                    "coupon_code": "Order amount too low for this coupon"
+                })
+
+            if coupon.usage_limit and coupon.usage_count >= coupon.usage_limit:
+                raise serializers.ValidationError({
+                    "coupon_code": "Coupon usage limit exceeded"
+                })
+
+            # Calculate discount
+            if coupon.type == "percentage":
+                discount = (subtotal * coupon.value) / Decimal("100")
+            else:
+                discount = coupon.value
+
+            applied_coupon = coupon
+
         total_amount = subtotal + shipping_fee + tax - discount
 
-        # Generate unique order number
         order_number = f"ORD-{uuid.uuid4().hex[:10].upper()}"
 
-        # Create Order
+        # =========================
+        # CREATE ORDER
+        # =========================
         order = Order.objects.create(
             order_number=order_number,
             user=request.user,
@@ -130,19 +176,21 @@ class OrderSerializer(serializers.Serializer):
             tax=tax,
             discount=discount,
             total_amount=total_amount,
-            # payment_method=validated_data.get("payment_method"),
             shipping_address=validated_data.get("shipping_address"),
-            customer_note=validated_data.get("customer_note", "")
+            customer_note=validated_data.get("customer_note", ""),
+            coupon=applied_coupon
         )
 
-        # Create Order Items
+        # =========================
+        # CREATE ORDER ITEMS
+        # =========================
         for item in items_data:
             product = item["product"]
             variant = item["variant"]
             qty = item["quantity"]
 
             price = variant.discount_price or variant.price
-            subtotal = price * qty
+            item_subtotal = price * qty
 
             OrderItem.objects.create(
                 order=order,
@@ -153,12 +201,26 @@ class OrderSerializer(serializers.Serializer):
                 variant_name=variant.variant_name,
                 quantity=qty,
                 price=price,
-                subtotal=subtotal
+                subtotal=item_subtotal
             )
 
-            # Reduce stock
             variant.stock -= qty
             variant.save()
+
+        # =========================
+        # COUPON USAGE UPDATE
+        # =========================
+        if applied_coupon:
+            CouponUsage.objects.create(
+                coupon=applied_coupon,
+                user=request.user,
+                order=order,
+                store=product.store,
+                discount_amount=discount
+            )
+
+            applied_coupon.usage_count += 1
+            applied_coupon.save(update_fields=["usage_count"])
 
         return order
 

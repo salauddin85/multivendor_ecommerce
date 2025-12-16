@@ -5,7 +5,7 @@ from apps.authentication.models import CustomUser
 from apps.stores.models import Store
 from apps.products.models import Product, ProductVariant
 from .constants.choices import STATUS_CHOICES, PAYMENT_STATUS_CHOICES,ORDER_TYPE_CHOICES
-
+from apps.coupons.models import Coupon
 
 
 
@@ -41,6 +41,7 @@ class Order(OrderBaseModel):
     order_number = models.CharField(max_length=50, unique=True)
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='orders',null=True, blank=True)
     parent = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='sub_orders')
+    coupon = models.ForeignKey(Coupon,on_delete=models.SET_NULL,null=True,blank=True,related_name="orders")
     subtotal = models.DecimalField(max_digits=10, decimal_places=2)
     shipping_fee = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     tax = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
