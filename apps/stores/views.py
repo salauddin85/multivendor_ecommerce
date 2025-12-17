@@ -101,3 +101,59 @@ class  OwnStoreView(APIView):
                 "data": None
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+
+
+class CommissionRatesView(APIView):
+    permission_classes = [IsAuthenticated,IsAdminUser]
+    
+    def post(self, request):
+        try:
+            serializer = serializers.CommissionRateSerializer(data=request.data)
+            if serializer.is_valid():
+                commission_rate = serializer.save()
+                log_request(request, "Commission rate created", "info", "Commission rate created successfully", response_status_code=status.HTTP_201_CREATED)
+                return Response({
+                    "code": status.HTTP_201_CREATED,
+                    "status": "success",
+                    "message": "Commission rate created successfully",
+                    "data": serializers.CommissionRateSerializer(commission_rate).data
+                }, status=status.HTTP_201_CREATED)
+            else:
+                log_request(request, "Commission rate creation failed", "warning", "Invalid data for commission rate", response_status_code=status.HTTP_400_BAD_REQUEST)
+                return Response({
+                    "code": status.HTTP_400_BAD_REQUEST,
+                    "status": "fail",
+                    "message": "Invalid data",
+                    "data": serializer.errors
+                }, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            logger.exception(str(e))
+            log_request(request, "Commission rate creation error", "error", "Error creating commission rate", response_status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({
+                "code": status.HTTP_500_INTERNAL_SERVER_ERROR,
+                "status": "error",
+                "message": "Error creating commission rate due to server error",
+                "data": None
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+            
+    def get(self, request):
+        try:
+            commission_rates = models.CommissionRate.objects.all()
+            serializer = serializers.CommissionRateSerializer(commission_rates, many=True)
+            log_request(request, "Commission rates fetched", "info", "Commission rates fetched successfully", response_status_code=status.HTTP_200_OK)
+            return Response({
+                "code": status.HTTP_200_OK,
+                "status": "success",
+                "message": "Commission rates fetched successfully",
+                "data": serializer.data
+            }, status=status.HTTP_200_OK)
+        except Exception as e:
+            logger.exception(str(e))
+            log_request(request, "Commission rates fetch error", "error", "Error fetching commission rates", response_status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({
+                "code": status.HTTP_500_INTERNAL_SERVER_ERROR,
+                "status": "error",
+                "message": "Error fetching commission rates due to server error",
+                "data": None
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

@@ -3,6 +3,7 @@ from django.conf import settings
 from django.utils.text import slugify
 from apps.authentication.models import StoreOwner,Vendor
 from .constants.store_choices import TYPE_CHOICES, STATUS_CHOICES
+from django.core.exceptions import ValidationError
 
 
 
@@ -12,13 +13,15 @@ class StoreBaseModel(models.Model):
 
     class Meta:
         abstract = True
-        
+
 
 class CommissionRate(models.Model):
     store_type = models.CharField(max_length=20, choices=TYPE_CHOICES)  # vendor / company
     rate = models.DecimalField(max_digits=5, decimal_places=2)
-
-
+   
+    def __str__(self):
+        return f"{self.store_type} - {self.rate}%"
+    
 class Store(StoreBaseModel):
     """Store/Shop model for vendors and companies"""
     
