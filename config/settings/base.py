@@ -65,6 +65,9 @@ INSTALLED_APPS = [
     'apps.review',
     'apps.wishlist',
     'apps.coupons',
+    'apps.admin_dashboard',
+    'apps.company_dashboard',
+    'apps.vendors_dashboard',
 ]
 
 MIDDLEWARE = [
@@ -299,3 +302,19 @@ SIMPLE_JWT = {
     # Send cookies only over HTTPS (for production)
     "AUTH_COOKIE_SECURE": os.getenv("COOKIE_SECURE") == "True",
 }
+
+
+
+
+# SSLCommerz Configuration
+SSLCOMMERZ_STORE_ID = os.getenv('SSLCOMMERZ_STORE_ID', default='your_store_id')
+SSLCOMMERZ_STORE_PASSWORD = os.getenv('SSLCOMMERZ_STORE_PASSWORD', default='your_store_password')
+SSLCOMMERZ_IS_SANDBOX = os.getenv('SSLCOMMERZ_IS_SANDBOX', default=True)
+
+# Payment callback URLs (use ngrok for local testing)
+SSLCOMMERZ_SUCCESS_URL = os.getenv('SSLCOMMERZ_SUCCESS_URL', default='http://localhost:8000/api/payments/v1/payments/sslcommerz/success/')
+SSLCOMMERZ_FAIL_URL = os.getenv('SSLCOMMERZ_FAIL_URL', default='http://localhost:8000/api/payments/v1/payments/sslcommerz/fail/')
+SSLCOMMERZ_CANCEL_URL = os.getenv('SSLCOMMERZ_CANCEL_URL', default='http://localhost:8000/api/payments/v1/payments/sslcommerz/cancel/')
+SSLCOMMERZ_IPN_URL = os.getenv('SSLCOMMERZ_IPN_URL', default='http://localhost:8000/api/payments/v1/payments/sslcommerz/ipn/')
+
+
