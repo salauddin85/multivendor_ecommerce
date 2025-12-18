@@ -3,7 +3,7 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.db import transaction
 from django.shortcuts import redirect
 from django.views.decorators.csrf import csrf_exempt
@@ -23,8 +23,9 @@ from .models import (
 from apps.orders.models import Order
 from . import serializers
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('myapp')
 
+from apps.orders.serializers import OrderSerializerView
 
 # ==========================================
 # PAYMENT INITIATION
@@ -55,33 +56,35 @@ class InitiatePaymentView(APIView):
                     "message": "Order already paid",
                     "data": {"order_id": order.id}
                 }, status=status.HTTP_400_BAD_REQUEST)
-            
+            # use transaction atomic to ensure data integrity
+            with transaction.atomic():
             # Initiate payment
-            ssl_service = SSLCommerzService()
-            result = ssl_service.initiate_payment(order, request.user)
-            
-            if result['success']:
-                return Response({
-                    "code": status.HTTP_200_OK,
-                    "status": "success",
-                    "message": "Payment session created",
-                    "data": {
-                        "payment_url": result['payment_url'],
-                        "transaction_id": result['transaction_id']
-                    }
-                }, status=status.HTTP_200_OK)
-            else:
-                return Response({
-                    "code": status.HTTP_400_BAD_REQUEST,
-                    "status": "failed",
-                    "message": result['error']
-                }, status=status.HTTP_400_BAD_REQUEST)
+                ssl_service = SSLCommerzService()
+                result = ssl_service.initiate_payment(order, request.user)
                 
+                if result['success']:
+                    return Response({
+                        "code": status.HTTP_200_OK,
+                        "status": "success",
+                        "message": "Payment session created",
+                        "data": {
+                            "payment_url": result['payment_url'],
+                            "transaction_id": result['transaction_id']
+                        }
+                    }, status=status.HTTP_200_OK)
+                else:
+                    return Response({
+                        "code": status.HTTP_400_BAD_REQUEST,
+                        "status": "failed",
+                        "message": result['error']
+                    }, status=status.HTTP_400_BAD_REQUEST)
+                    
         except Order.DoesNotExist:
             return Response({
                 "code": status.HTTP_404_NOT_FOUND,
                 "status": "failed",
-                "message": "Order not found"
+                "message": "Order not found",
+                "data": {"order_id": order_id}
             }, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
             logger.exception(str(e))
@@ -97,10 +100,9 @@ class InitiatePaymentView(APIView):
 # SSLCOMMERZ CALLBACKS
 # ==========================================
 
-@method_decorator(csrf_exempt, name='dispatch')
 class SSLCommerzSuccessView(APIView):
     """Handle SSLCommerz success callback"""
-    permission_classes = []
+    permission_classes = [AllowAny]
     
     def post(self, request):
         try:
@@ -109,13 +111,28 @@ class SSLCommerzSuccessView(APIView):
             
             if result['success']:
                 # Redirect to success page
-                return redirect(f"/order-success/{result['order'].order_number}")
+                return Response({
+                    "code": status.HTTP_200_OK,
+                    "status": "success",
+                    "message": "Payment successful",
+                    "data": {"order_id": result['order'].id}
+                }, status=status.HTTP_200_OK)
             else:
-                return redirect(f"/payment-failed")
+                return Response({
+                    "code": status.HTTP_400_BAD_REQUEST,
+                    "status": "failed",
+                    "message": "Payment validation failed",
+                    "errors": result["error"]
+                }, status=status.HTTP_400_BAD_REQUEST)
                 
         except Exception as e:
             logger.exception(str(e))
-            return redirect("/payment-failed")
+            return Response({
+                "code": status.HTTP_500_INTERNAL_SERVER_ERROR,
+                "status": "failed",
+                "message": "Payment processing failed",
+                "errors": {"server_error": [str(e)]}
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @method_decorator(csrf_exempt, name='dispatch')
@@ -447,5 +464,31 @@ class RefundRequestView(APIView):
                 "code": status.HTTP_500_INTERNAL_SERVER_ERROR,
                 "status": "failed",
                 "message": "Failed to create refund request",
+                "errors": {"server_error": [str(e)]}
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+            
+# retrieve all payments made by the user
+class PaymentListView(APIView):
+    """Retrieve all payments made by the user"""
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        try:
+            payments = Payment.objects.all().order_by('-created_at')
+            serializer = serializers.PaymentSerializer(payments, many=True)
+            
+            return Response({
+                "code": status.HTTP_200_OK,
+                "status": "success",
+                "message": "Payments retrieved successfully",
+                "data": serializer.data
+            }, status=status.HTTP_200_OK)
+        except Exception as e:
+            logger.exception(str(e))
+            return Response({
+                "code": status.HTTP_500_INTERNAL_SERVER_ERROR,
+                "status": "failed",
+                "message": "Failed to retrieve payments",
                 "errors": {"server_error": [str(e)]}
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

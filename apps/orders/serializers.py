@@ -64,26 +64,48 @@ class ShippingAddressSerializerForView(serializers.ModelSerializer):
 
 
 class OrderItemInputSerializer(serializers.Serializer):
-    product = serializers.PrimaryKeyRelatedField(queryset=Product.objects.all())
-    variant = serializers.PrimaryKeyRelatedField(queryset=ProductVariant.objects.all())
+    product = serializers.PrimaryKeyRelatedField(
+        queryset=Product.objects.select_for_update()
+    )
+    variant = serializers.PrimaryKeyRelatedField(
+        queryset=ProductVariant.objects.select_for_update(),
+        required=False,
+        allow_null=True
+    )
     quantity = serializers.IntegerField(min_value=1)
 
     def validate(self, data):
-        """Validate product-variant relationship and stock"""
+        product = data["product"]
+        variant = data.get("variant")
+        quantity = data["quantity"]
 
-        variant = data["variant"]
+        # =========================
+        # VARIANT VALIDATION
+        # =========================
+        if variant:
+            # variant must belong to product
+            if variant.product_id != product.id:
+                raise serializers.ValidationError({
+                    "variant": "This variant does not belong to the selected product."
+                })
 
-        # check variant belongs to product
-        if variant.product_id != data["product"].id:
-            raise serializers.ValidationError(
-                {"variant": f"This variant {variant.id} does not belong to this product."}
-            )
+            # stock check (variant based)
+            if variant.stock < quantity:
+                raise serializers.ValidationError(
+                    f"Only {variant.stock} items available for this variant."
+                )
+        else:
+            # product has variants but variant not provided
+            if product.variants is not None and product.variants.exists():
+                raise serializers.ValidationError({
+                    "variant": "Variant is required for this product."
+                })
 
-        # check stock
-        if variant.stock < data["quantity"]:
-            raise serializers.ValidationError(
-                {"stock": f"Only {variant.stock} items available in stock."}
-            )
+            # stock check (product based)
+            if product.stock < quantity:
+                raise serializers.ValidationError(
+                    f"Only {product.stock} items available for this product."
+                )
 
         return data
 
@@ -92,20 +114,24 @@ class OrderSerializer(serializers.Serializer):
     shipping_address = serializers.PrimaryKeyRelatedField(
         queryset=ShippingAddress.objects.all()
     )
-    # payment_method = serializers.CharField()
     customer_note = serializers.CharField(required=False, allow_blank=True)
     items = OrderItemInputSerializer(many=True)
     coupon_code = serializers.CharField(required=False, allow_blank=True)
-    
 
-
+    # =========================
+    # ADDRESS OWNERSHIP CHECK
+    # =========================
     def validate_shipping_address(self, value):
         request = self.context["request"]
         if value.user != request.user:
-            raise serializers.ValidationError("This address does not belong to you.")
+            raise serializers.ValidationError(
+                "This shipping address does not belong to you."
+            )
         return value
-    
 
+    # =========================
+    # CREATE ORDER
+    # =========================
     @transaction.atomic
     def create(self, validated_data):
         request = self.context["request"]
@@ -115,18 +141,29 @@ class OrderSerializer(serializers.Serializer):
 
         subtotal = Decimal("0.00")
 
+        # =========================
+        # SUBTOTAL CALCULATION
+        # =========================
         for item in items_data:
-            variant = item["variant"]
-            price = variant.discount_price or variant.price
-            subtotal += price * item["quantity"]
+            product = item["product"]
+            variant = item.get("variant")
+            qty = item["quantity"]
 
+            if variant:
+                price = variant.discount_price or variant.price
+            else:
+                price = product.base_price
+
+            subtotal += price * qty
+        # =========================
+        # SHIPPING, TAX, DISCOUNT
         shipping_fee = Decimal("50.00")
         tax = Decimal("0.00")
         discount = Decimal("0.00")
         applied_coupon = None
 
         # =========================
-        # COUPON VALIDATION LOGIC
+        # COUPON VALIDATION
         # =========================
         if coupon_code:
             now = timezone.now()
@@ -140,20 +177,19 @@ class OrderSerializer(serializers.Serializer):
 
             if not coupon:
                 raise serializers.ValidationError({
-                    "coupon_code": "Invalid or expired coupon"
+                    "coupon_code": "Invalid or expired coupon."
                 })
 
             if subtotal < coupon.min_order_amount:
                 raise serializers.ValidationError({
-                    "coupon_code": "Order amount too low for this coupon"
+                    "coupon_code": "Order amount too low for this coupon."
                 })
 
             if coupon.usage_limit and coupon.usage_count >= coupon.usage_limit:
                 raise serializers.ValidationError({
-                    "coupon_code": "Coupon usage limit exceeded"
+                    "coupon_code": "Coupon usage limit exceeded."
                 })
 
-            # Calculate discount
             if coupon.type == "percentage":
                 discount = (subtotal * coupon.value) / Decimal("100")
             else:
@@ -163,20 +199,18 @@ class OrderSerializer(serializers.Serializer):
 
         total_amount = subtotal + shipping_fee + tax - discount
 
-        order_number = f"ORD-{uuid.uuid4().hex[:10].upper()}"
-
         # =========================
         # CREATE ORDER
         # =========================
         order = Order.objects.create(
-            order_number=order_number,
+            order_number=f"ORD-{uuid.uuid4().hex[:10].upper()}",
             user=request.user,
             subtotal=subtotal,
             shipping_fee=shipping_fee,
             tax=tax,
             discount=discount,
             total_amount=total_amount,
-            shipping_address=validated_data.get("shipping_address"),
+            shipping_address=validated_data["shipping_address"],
             customer_note=validated_data.get("customer_note", ""),
             coupon=applied_coupon
         )
@@ -186,11 +220,15 @@ class OrderSerializer(serializers.Serializer):
         # =========================
         for item in items_data:
             product = item["product"]
-            variant = item["variant"]
+            variant = item.get("variant")
             qty = item["quantity"]
 
-            price = variant.discount_price or variant.price
-            item_subtotal = price * qty
+            if variant:
+                price = variant.discount_price or variant.price
+                variant_name = variant.variant_name
+            else:
+                price = product.base_price
+                variant_name = ""
 
             OrderItem.objects.create(
                 order=order,
@@ -198,24 +236,31 @@ class OrderSerializer(serializers.Serializer):
                 variant=variant,
                 store=product.store,
                 product_name=product.title,
-                variant_name=variant.variant_name,
+                variant_name=variant_name,
                 quantity=qty,
                 price=price,
-                subtotal=item_subtotal
+                subtotal=price * qty
             )
 
-            variant.stock -= qty
-            variant.save()
+            # =========================
+            # STOCK UPDATE (CRITICAL)
+            # =========================
+            if variant:
+                variant.stock -= qty
+                variant.save(update_fields=["stock"])
+            else:
+                product.stock -= qty
+                product.save(update_fields=["stock"])
 
         # =========================
-        # COUPON USAGE UPDATE
+        # COUPON USAGE TRACKING
         # =========================
         if applied_coupon:
             CouponUsage.objects.create(
                 coupon=applied_coupon,
                 user=request.user,
                 order=order,
-                store=product.store,
+                store=order.items.first().store,
                 discount_amount=discount
             )
 

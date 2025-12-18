@@ -4,6 +4,7 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
+    path('v1/payments/', views.PaymentListView.as_view(), name='payment_list'),
     # Payment initiation
     path('v1/payments/initiate/', views.InitiatePaymentView.as_view(), name='initiate_payment'),
     

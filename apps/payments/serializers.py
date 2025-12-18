@@ -12,12 +12,15 @@ from apps.orders.models import OrderItem
 
 class PaymentSerializer(serializers.ModelSerializer):
     """Payment details"""
+    # user = serializers.StringRelatedField(read_only=True)
+    # order_number = serializers.CharField(source='order.order_number', read_only=True)
     
     class Meta:
         model = Payment
         fields = [
             'id', 'transaction_id', 'method', 'amount', 
-            'currency', 'status', 'paid_at', 'created_at'
+            'currency', 'status', 'paid_at', 'created_at',
+             'gateway_response'
         ]
 
 

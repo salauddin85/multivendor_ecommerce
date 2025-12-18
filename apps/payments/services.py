@@ -39,33 +39,43 @@ class SSLCommerzService:
         transaction_id = f"TXN-{uuid.uuid4().hex[:12].upper()}"
         
         post_data = {
+            # Success and failure URLs
+            'success_url': settings.SSLCOMMERZ_SUCCESS_URL,
+            'fail_url': settings.SSLCOMMERZ_FAIL_URL,
+            'cancel_url': settings.SSLCOMMERZ_CANCEL_URL,
+            'ipn_url': settings.SSLCOMMERZ_IPN_URL,
             # Transaction Info
             'total_amount': str(order.total_amount),
             'currency': 'BDT',
             'tran_id': transaction_id,
-            
+
             # Customer Info
-            'cus_name': user.get_full_name() or user.email,
+            'cus_name': f"{user.first_name} {user.last_name or user.email}",
             'cus_email': user.email,
             'cus_phone': getattr(user, 'phone', '01700000000'),
             'cus_add1': order.shipping_address.address_line if order.shipping_address else 'N/A',
             'cus_city': order.shipping_address.city if order.shipping_address else 'Dhaka',
             'cus_country': order.shipping_address.country if order.shipping_address else 'Bangladesh',
-            
+
+            #  Shipping Info (IMPORTANT)
+            'shipping_method': 'YES',
+            'ship_name': order.shipping_address.name if order.shipping_address else 'Customer',
+            'ship_add1': order.shipping_address.address_line if order.shipping_address else 'N/A',
+            'ship_city': order.shipping_address.city if order.shipping_address else 'Dhaka',
+            'ship_country': order.shipping_address.country if order.shipping_address else 'Bangladesh',
+            'ship_phone': order.shipping_address.phone if order.shipping_address else '01700000000',
+            'ship_postcode': order.shipping_address.postal_code if order.shipping_address else '0000',
             # Product Info
             'product_name': f"Order {order.order_number}",
             'product_category': 'General',
             'product_profile': 'general',
-            
-            # Shipping Info
-            'shipping_method': 'YES',
             'num_of_item': order.items.count(),
-            
-            # Additional Info
-            'value_a': order.id,  # Order ID for callback
-            'value_b': user.id,   # User ID for callback
+
+            # Additional
+            'value_a': order.id,
+            'value_b': user.id,
         }
-        
+
         # Create payment record
         payment = Payment.objects.create(
             order=order,
@@ -117,11 +127,13 @@ class SSLCommerzService:
         
         try:
             payment = Payment.objects.get(transaction_id=transaction_id)
-            
+            if payment.status == "completed":
+                return {"success": True}
             # Validate with SSLCommerz
             validation = self.validate_payment(val_id)
             
-            if validation.get('status') == 'VALID':
+            if validation.get('status') in ['VALID', 'VALIDATED']:
+
                 with transaction.atomic():
                     # Update payment
                     payment.status = 'completed'
