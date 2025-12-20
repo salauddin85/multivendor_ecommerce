@@ -135,42 +135,154 @@ class SSLCommerzSuccessView(APIView):
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-@method_decorator(csrf_exempt, name='dispatch')
 class SSLCommerzFailView(APIView):
     """Handle SSLCommerz fail callback"""
-    permission_classes = []
+    permission_classes = [AllowAny]
     
     def post(self, request):
-        transaction_id = request.data.get('tran_id')
-        
         try:
-            payment = Payment.objects.get(transaction_id=transaction_id)
-            payment.status = 'failed'
-            payment.gateway_response = request.data
-            payment.save()
-        except Payment.DoesNotExist:
-            pass
+            transaction_id = request.data.get('tran_id')
+            print("Fail callback received for transaction:", transaction_id)
+            
+            if not transaction_id:
+                return Response({
+                    "code": status.HTTP_400_BAD_REQUEST,
+                    "status": "failed",
+                    "message": "Transaction ID not provided",
+                    "errors": {"transaction_id": ["Transaction ID is required"]}
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            try:
+                payment = Payment.objects.get(transaction_id=transaction_id)
+                payment.status = 'failed'
+                payment.gateway_response = request.data
+                payment.save()
         
-        return redirect("/payment-failed")
+                
+                logger.info(f"Payment failed for transaction: {transaction_id}")
+                
+                return Response({
+                    "code": status.HTTP_200_OK,
+                    "status": "failed",
+                    "message": "Payment failed",
+                    "data": {
+                        "transaction_id": transaction_id,
+                        "status": "failed",
+                        "payment_id": payment.id if payment else None
+                    }
+                }, status=status.HTTP_200_OK)
+                
+            except Payment.DoesNotExist:
+                logger.warning(f"Payment not found for transaction: {transaction_id}")
+                return Response({
+                    "code": status.HTTP_404_NOT_FOUND,
+                    "status": "failed",
+                    "message": "Payment not found",
+                    "errors": {"transaction_id": ["Payment record not found"]}
+                }, status=status.HTTP_404_NOT_FOUND)
+                
+        except Exception as e:
+            logger.exception(f"Error processing fail callback: {str(e)}")
+            return Response({
+                "code": status.HTTP_500_INTERNAL_SERVER_ERROR,
+                "status": "error",
+                "message": "Failed to process payment failure",
+                "errors": {"server_error": [str(e)]}
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-@method_decorator(csrf_exempt, name='dispatch')
 class SSLCommerzCancelView(APIView):
     """Handle SSLCommerz cancel callback"""
-    permission_classes = []
+    permission_classes = [AllowAny]
     
     def post(self, request):
-        transaction_id = request.data.get('tran_id')
-        
         try:
-            payment = Payment.objects.get(transaction_id=transaction_id)
-            payment.status = 'failed'
-            payment.gateway_response = request.data
-            payment.save()
-        except Payment.DoesNotExist:
-            pass
+            transaction_id = request.data.get('tran_id')
+            
+            if not transaction_id:
+                return Response({
+                    "code": status.HTTP_400_BAD_REQUEST,
+                    "status": "cancelled",
+                    "message": "Transaction ID not provided",
+                    "errors": {"transaction_id": ["Transaction ID is required"]}
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            try:
+                payment = Payment.objects.get(transaction_id=transaction_id)
+                payment.status = 'cancelled'
+                payment.gateway_response = request.data
+                payment.save()
+                
+            
+                logger.info(f"Payment cancelled for transaction: {transaction_id}")
+                
+                return Response({
+                    "code": status.HTTP_200_OK,
+                    "status": "cancelled",
+                    "message": "Payment cancelled by user",
+                    "data": {
+                        "transaction_id": transaction_id,
+                        "status": "cancelled",
+                        "payment_id": payment.id if payment else None
+                    }
+                }, status=status.HTTP_200_OK)
+                
+            except Payment.DoesNotExist:
+                logger.warning(f"Payment not found for transaction: {transaction_id}")
+                return Response({
+                    "code": status.HTTP_404_NOT_FOUND,
+                    "status": "cancelled",
+                    "message": "Payment not found",
+                    "errors": {"transaction_id": ["Payment record not found"]}
+                }, status=status.HTTP_404_NOT_FOUND)
+                
+        except Exception as e:
+            logger.exception(f"Error processing cancel callback: {str(e)}")
+            return Response({
+                "code": status.HTTP_500_INTERNAL_SERVER_ERROR,
+                "status": "error",
+                "message": "Failed to process payment cancellation",
+                "errors": {"server_error": [str(e)]}
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+
+# @method_decorator(csrf_exempt, name='dispatch')
+# class SSLCommerzFailView(APIView):
+#     """Handle SSLCommerz fail callback"""
+#     permission_classes = []
+    
+#     def post(self, request):
+#         transaction_id = request.data.get('tran_id')
         
-        return redirect("/payment-cancelled")
+#         try:
+#             payment = Payment.objects.get(transaction_id=transaction_id)
+#             payment.status = 'failed'
+#             payment.gateway_response = request.data
+#             payment.save()
+#         except Payment.DoesNotExist:
+#             pass
+        
+#         return redirect("/payment-failed")
+
+
+# @method_decorator(csrf_exempt, name='dispatch')
+# class SSLCommerzCancelView(APIView):
+#     """Handle SSLCommerz cancel callback"""
+#     permission_classes = []
+    
+#     def post(self, request):
+#         transaction_id = request.data.get('tran_id')
+        
+#         try:
+#             payment = Payment.objects.get(transaction_id=transaction_id)
+#             payment.status = 'failed'
+#             payment.gateway_response = request.data
+#             payment.save()
+#         except Payment.DoesNotExist:
+#             pass
+        
+#         return redirect("/payment-cancelled")
 
 
 # ==========================================

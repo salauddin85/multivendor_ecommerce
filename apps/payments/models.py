@@ -28,8 +28,10 @@ class Payment(PaymentBaseModel):
         ('processing', 'Processing'),
         ('completed', 'Completed'),
         ('failed', 'Failed'),
+        ('cancelled', 'Cancelled'),
         ('refunded', 'Refunded'),
         ('partially_refunded', 'Partially Refunded'),
+        
     )
     
     PAYMENT_METHOD = (
@@ -38,11 +40,8 @@ class Payment(PaymentBaseModel):
         ('bank_transfer', 'Bank Transfer'),
     )
     
-    order = models.OneToOneField(
-        Order, 
-        on_delete=models.CASCADE, 
-        related_name='payment',null=True, blank=True
-    )
+    
+    order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='payments',null=True, blank=True)
     transaction_id = models.CharField(max_length=100, unique=True, db_index=True)
     method = models.CharField(max_length=50, choices=PAYMENT_METHOD, default='sslcommerz')
     amount = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
@@ -190,7 +189,7 @@ class Wallet(PaymentBaseModel):
     total_withdrawn = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     
     def __str__(self):
-        return f"Wallet - {self.store.store_name}"
+        return f"Wallet - {self.store.store_name} -Type: {self.store.type}"
 
 
 class WalletTransaction(PaymentBaseModel):

@@ -127,8 +127,9 @@ class ProductImageSerializerForProduct(serializers.ModelSerializer):
 class ProductSerializerView(DynamicFieldsModelSerializer):
     store = serializers.StringRelatedField()
     # images = ProductImageSerializerForProduct(many=True, read_only=True)
-    brand = serializers.StringRelatedField(source = 'brand.name')
-    category = serializers.StringRelatedField(source = 'category.name')
+    brand = serializers.StringRelatedField()
+    category = serializers.StringRelatedField()
+    
     
     class Meta:
         model = models.Product

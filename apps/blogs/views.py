@@ -345,10 +345,9 @@ class BlogView(APIView):
 
     def post(self, request):
         try:
-            user = request.user
             data = request.data
             serializer = serializers.BlogSerializer(
-                data=data, context={"user": user})
+                data=data)
             if serializer.is_valid():
                 blog = serializer.save()
                 title = serializer.validated_data["title"]

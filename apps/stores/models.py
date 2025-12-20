@@ -48,7 +48,7 @@ class Store(StoreBaseModel):
         super().save(*args, **kwargs)
     
     def __str__(self):
-        return self.store_name
+        return f"{self.type} - {self.store_name}"
 
 
 

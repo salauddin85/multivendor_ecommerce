@@ -35,6 +35,17 @@ class SSLCommerzService:
     
     def initiate_payment(self, order, user):
         """Initialize payment session with SSLCommerz"""
+        # STEP-1: check existing pending/processing payment
+        existing_payment = Payment.objects.filter(
+            order=order,
+            status__in=['pending', 'processing']
+        ).first()
+        if existing_payment:
+            return {
+                'success': True,
+                'payment_url': existing_payment.gateway_response.get('GatewayPageURL'),
+                'transaction_id': existing_payment.transaction_id
+            }
         
         transaction_id = f"TXN-{uuid.uuid4().hex[:12].upper()}"
         
@@ -50,7 +61,7 @@ class SSLCommerzService:
             'tran_id': transaction_id,
 
             # Customer Info
-            'cus_name': f"{user.first_name} {user.last_name or user.email}",
+            'cus_name': f"{user.first_name} {user.last_name}",
             'cus_email': user.email,
             'cus_phone': getattr(user, 'phone', '01700000000'),
             'cus_add1': order.shipping_address.address_line if order.shipping_address else 'N/A',
@@ -194,7 +205,10 @@ class PaymentProcessingService:
             # Calculate amounts
             item_amount = item.subtotal
             platform_commission = (item_amount * commission_rate) / Decimal('100')
-            vendor_amount = item_amount - platform_commission
+            if item.store.type == 'vendor':
+                vendor_amount = item_amount - platform_commission
+            else:
+                company_amount = item_amount - platform_commission
             
             # Create hold
             hold = PlatformHold.objects.create(
@@ -203,20 +217,25 @@ class PaymentProcessingService:
                 store=store,
                 amount=item_amount,
                 platform_commission=platform_commission,
-                vendor_amount=vendor_amount,
+                vendor_amount=vendor_amount if store.type=='vendor' else None,
+                company_amount=company_amount if store.type=='company' else None,
                 status='holding'
             )
             
             # Update wallet pending balance
             wallet, _ = Wallet.objects.get_or_create(store=store)
-            wallet.pending_balance += vendor_amount
+            if store.type == 'vendor' and store.type != 'company':
+                wallet.pending_balance += vendor_amount
+            if store.type == 'company' and store.type != 'vendor':
+                wallet.pending_balance += company_amount
             wallet.save()
             
+            wallet_transaction_amount = vendor_amount if store.type=='vendor' else company_amount
             # Create wallet transaction
             WalletTransaction.objects.create(
                 wallet=wallet,
                 transaction_type='hold',
-                amount=vendor_amount,
+                amount=wallet_transaction_amount ,
                 balance_after=wallet.available_balance,
                 reference=order.order_number,
                 description=f"Payment hold for order {order.order_number}"
@@ -227,7 +246,7 @@ class PaymentProcessingService:
     def release_holds_and_create_payouts():
         """
         Cron job to run daily
-        Release holds after 7 days and move money to vendor wallet
+        Release holds after 7 days and move money to vendor and company wallet
         """
         
         now = timezone.now()
@@ -339,7 +358,7 @@ class PaymentProcessingService:
 # ==========================================
 
 class WithdrawalService:
-    """Handle vendor withdrawal requests and payouts"""
+    """Handle vendor and company withdrawal requests and payouts"""
     
     @staticmethod
     @transaction.atomic

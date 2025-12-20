@@ -6,11 +6,12 @@ import pdb
 
 
 class BlogSerializer(serializers.Serializer):
-    title = serializers.CharField(max_length=200, required=False)
-    featured_image = serializers.ImageField(required=False)
-    summary = serializers.CharField(required=False)
-    content = serializers.CharField(required=False)
-    category = serializers.PrimaryKeyRelatedField(queryset=models.Category.objects.all(), required=False)
+    title = serializers.CharField(max_length=200)
+    author_name = serializers.CharField(max_length=100)
+    featured_image = serializers.ImageField()
+    summary = serializers.CharField()
+    content = serializers.CharField()
+    category = serializers.PrimaryKeyRelatedField(queryset=models.Category.objects.all())
 
     # tags as comma-separated string
     tags = serializers.CharField(required=False)
@@ -28,8 +29,7 @@ class BlogSerializer(serializers.Serializer):
             tags = [int(t.strip()) for t in tags.split(",") if t.strip().isdigit()]
         print("parsed tags:", tags)
 
-        author = self.context['user']
-        blog = models.Blog.objects.create(**validated_data, author=author)
+        blog = models.Blog.objects.create(**validated_data)
 
         if tags:
             valid_tags = models.Tag.objects.filter(id__in=tags)
@@ -39,6 +39,7 @@ class BlogSerializer(serializers.Serializer):
 
     def update(self, instance, validated_data):
         instance.title = validated_data.get("title", instance.title)
+        instance.author_name = validated_data.get("author_name", instance.author_name)
         instance.featured_image = validated_data.get("featured_image", instance.featured_image)
         instance.summary = validated_data.get("summary", instance.summary)
         instance.content = validated_data.get("content", instance.content)
@@ -60,16 +61,14 @@ class BlogSerializer(serializers.Serializer):
 
 
 class BlogSerializerForView(serializers.ModelSerializer):
-    author = serializers.StringRelatedField()
     
     
     class Meta:
         model = models.Blog
-        fields = ['id', 'title', 'author',  'featured_image', 'summary', 'created_at']
+        fields = ['id', 'title', 'author_name',  'featured_image', 'summary', 'created_at']
         
 
 class BlogSpecificDetailSerializer(serializers.ModelSerializer):
-    author = serializers.StringRelatedField()
     category = serializers.StringRelatedField()
     tags = serializers.StringRelatedField(many=True)
     class Meta:
