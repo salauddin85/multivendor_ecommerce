@@ -40,34 +40,80 @@ class WalletSerializer(serializers.ModelSerializer):
 
 class WalletTransactionSerializer(serializers.ModelSerializer):
     """Wallet transaction history"""
+    wallet = serializers.StringRelatedField(read_only=True)
     
     class Meta:
         model = WalletTransaction
         fields = [
-            'id', 'transaction_type', 'amount', 
+            'id', 'wallet', 'transaction_type', 'amount', 
             'balance_after', 'reference', 'description',
             'created_at'
         ]
 
 
-class WithdrawalRequestSerializer(serializers.ModelSerializer):
+# class WithdrawalRequestSerializer(serializers.ModelSerializer):
+#     """Withdrawal request creation and display"""
+    
+#     store_name = serializers.CharField(source='store.store_name', read_only=True)
+    
+#     class Meta:
+#         model = WithdrawalRequest
+#         fields = [
+#             'id', 'store_name', 'amount', 'account_holder_name',
+#             'bank_name', 'account_number', 'routing_number',
+#             'status', 'admin_note', 'created_at', 'reviewed_at'
+#         ]
+#         read_only_fields = ['store_name', 'status', 'admin_note', 'reviewed_at']
+    
+#     def validate_amount(self, value):
+#         if value < Decimal('100.00'):
+#             raise serializers.ValidationError(
+#                 "Minimum withdrawal amount is 100 BDT"
+#             )
+#         return value
+    
+#     def create(self, validated_data):
+#         request = self.context['request']
+#         user = request.user
+        
+#         # Get store
+#         store = None
+#         if hasattr(user, 'vendor'):
+#             store = user.vendor.vendor_stores.first()
+#         elif hasattr(user, 'store_owner'):
+#             store = user.store_owner.store_owner_stores.first()
+        
+#         if not store:
+#             raise serializers.ValidationError("Store not found")
+        
+#         # Create withdrawal using service
+#         bank_details = {
+#             'account_holder_name': validated_data['account_holder_name'],
+#             'bank_name': validated_data['bank_name'],
+#             'account_number': validated_data['account_number'],
+#             'routing_number': validated_data.get('routing_number', ''),
+#         }
+        
+#         withdrawal = WithdrawalService.create_withdrawal_request(
+#             store=store,
+#             amount=validated_data['amount'],
+#             bank_details=bank_details
+#         )
+        
+#         return withdrawal
+
+class WithdrawalRequestSerializer(serializers.Serializer):
     """Withdrawal request creation and display"""
-    
-    store_name = serializers.CharField(source='store.store_name', read_only=True)
-    
-    class Meta:
-        model = WithdrawalRequest
-        fields = [
-            'id', 'store_name', 'amount', 'account_holder_name',
-            'bank_name', 'account_number', 'routing_number',
-            'status', 'admin_note', 'created_at', 'reviewed_at'
-        ]
-        read_only_fields = ['store_name', 'status', 'admin_note', 'reviewed_at']
+    amount = serializers.DecimalField(max_digits=10, decimal_places=2)
+    account_holder_name = serializers.CharField(max_length=100)
+    bank_name = serializers.CharField(max_length=100)
+    account_number = serializers.CharField(max_length=50)
+    routing_number = serializers.CharField(max_length=50, required=False, allow_blank=True)
     
     def validate_amount(self, value):
-        if value < Decimal('100.00'):
+        if value < Decimal('500.00'):
             raise serializers.ValidationError(
-                "Minimum withdrawal amount is 100 BDT"
+                "Minimum withdrawal amount is 500 BDT"
             )
         return value
     
@@ -178,75 +224,7 @@ class PlatformHoldSerializer(serializers.ModelSerializer):
         ]
 
 
-# ==========================================
-# CELERY TASKS
-# ==========================================
 
-# apps/payments/tasks.py
-
-from celery import shared_task
-from django.utils import timezone
-from .services import PaymentProcessingService
-import logging
-
-logger = logging.getLogger(__name__)
-
-
-@shared_task(name='release_holds_and_create_payouts')
-def release_holds_and_create_payouts():
-    """
-    Celery task to release holds after 7 days
-    Run this daily via celery beat
-    """
-    try:
-        logger.info("Starting hold release process")
-        
-        PaymentProcessingService.release_holds_and_create_payouts()
-        
-        logger.info("Hold release process completed successfully")
-        
-        return {
-            'status': 'success',
-            'message': 'Holds released successfully'
-        }
-    except Exception as e:
-        logger.exception(f"Hold release failed: {str(e)}")
-        return {
-            'status': 'failed',
-            'error': str(e)
-        }
-
-
-@shared_task(name='process_pending_refunds')
-def process_pending_refunds():
-    """
-    Process approved refunds
-    Can be triggered manually or scheduled
-    """
-    from .models import RefundRequest
-    
-    try:
-        pending_refunds = RefundRequest.objects.filter(
-            status='approved'
-        ).select_related('order', 'order_item')
-        
-        for refund in pending_refunds:
-            try:
-                PaymentProcessingService.process_refund(refund)
-                logger.info(f"Processed refund {refund.id}")
-            except Exception as e:
-                logger.exception(f"Failed to process refund {refund.id}: {str(e)}")
-        
-        return {
-            'status': 'success',
-            'processed': pending_refunds.count()
-        }
-    except Exception as e:
-        logger.exception(f"Refund processing failed: {str(e)}")
-        return {
-            'status': 'failed',
-            'error': str(e)
-        }
 
 
 # ==========================================

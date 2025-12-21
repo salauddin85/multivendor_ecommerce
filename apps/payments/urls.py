@@ -14,85 +14,19 @@ urlpatterns = [
     path('v1/payments/sslcommerz/cancel/', views.SSLCommerzCancelView.as_view(), name='sslcommerz_cancel'),
     
     # Wallet
-    path('v1/payments/wallet/', views.WalletView.as_view(), name='wallet'),
-    path('v1/payments/wallet/transactions/', views.WalletTransactionsView.as_view(), name='wallet_transactions'),
+    path('v1/payments/wallets/', views.WalletView.as_view(), name='wallet'),
+    path('v1/payments/wallets/list/', views.WalletListView.as_view(), name='wallets_list'),
+    path('v1/payments/wallets/transactions/', views.WalletTransactionsView.as_view(), name='wallet_transactions'),
+    path('v1/payments/wallets/transactions/list/', views.WalletTransactionListView.as_view(), name='wallet_transactions_list'),
     # Withdrawal
-    path('withdrawals/', views.WithdrawalRequestView.as_view(), name='withdrawals'),
-    path('withdrawals/<int:withdrawal_id>/action/', views.AdminWithdrawalActionView.as_view(), name='withdrawal-action'),
+    path('v1/payments/wallets/withdrawals/', views.WithdrawalRequestView.as_view(), name='withdrawals'),
+    path('v1/payments/wallets/withdrawals/list/', views.WithdrawalListView.as_view(), name='withdrawal-list'),
+    path('v1/payments/wallets/withdrawals/<int:withdrawal_id>/action/', views.AdminWithdrawalActionView.as_view(), name='withdrawal-action'),
     
     # Refund
-    path('refunds/', views.RefundRequestView.as_view(), name='refunds'),
+    path('v1/payments/refunds/', views.RefundRequestView.as_view(), name='refunds'),
+    path('v1/payments/refunds/list/', views.RefundListView.as_view(), name='refund-list'),
+    
+    path('v1/payments/platform_holds/', views.PlatformHoldListView.as_view(), name='platform_hold_list'),
 ]
 
-
-
-# project/celery.py
-
-"""
-import os
-from celery import Celery
-from celery.schedules import crontab
-
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'project.settings')
-
-app = Celery('project')
-app.config_from_object('django.conf:settings', namespace='CELERY')
-app.autodiscover_tasks()
-
-# Celery Beat Schedule
-app.conf.beat_schedule = {
-    'release-holds-daily': {
-        'task': 'release_holds_and_create_payouts',
-        'schedule': crontab(hour=2, minute=0),  # Run daily at 2 AM
-    },
-    'process-refunds-hourly': {
-        'task': 'process_pending_refunds',
-        'schedule': crontab(minute=0),  # Run every hour
-    },
-}
-
-@app.task(bind=True)
-def debug_task(self):
-    print(f'Request: {self.request!r}')
-"""
-
-
-# ==========================================
-# __init__.py (in project folder)
-# ==========================================
-
-"""
-# project/__init__.py
-
-from .celery import app as celery_app
-
-__all__ = ('celery_app',)
-"""
-
-
-
-# ==========================================
-# MANAGEMENT COMMAND
-# ==========================================
-
-# apps/payments/management/commands/process_holds.py
-
-"""
-from django.core.management.base import BaseCommand
-from apps.payments.services import PaymentProcessingService
-
-
-class Command(BaseCommand):
-    help = 'Process platform holds and release payments'
-
-    def handle(self, *args, **options):
-        try:
-            PaymentProcessingService.release_holds_and_create_payouts()
-            self.stdout.write(
-                self.style.SUCCESS('Successfully processed holds')
-            )
-        except Exception as e:
-            self.stdout.write(
-                self.style.ERROR(f'Failed to process holds: {str(e)}')
-            )
-"""

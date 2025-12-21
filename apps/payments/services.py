@@ -368,8 +368,8 @@ class WithdrawalService:
         wallet = Wallet.objects.select_for_update().get(store=store)
         
         # Validation
-        if amount < Decimal('100.00'):
-            raise ValueError("Minimum withdrawal amount is 100 BDT")
+        if amount < Decimal('500.00'):
+            raise ValueError("Minimum withdrawal amount is 500 BDT")
         
         if amount > wallet.available_balance:
             raise ValueError("Insufficient balance")

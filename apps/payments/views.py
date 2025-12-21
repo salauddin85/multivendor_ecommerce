@@ -3,7 +3,7 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.permissions import IsAuthenticated, AllowAny, IsAdminUser
 from django.db import transaction
 from django.shortcuts import redirect
 from django.views.decorators.csrf import csrf_exempt
@@ -13,17 +13,19 @@ import logging
 
 from .services import (
     SSLCommerzService, 
-    PaymentProcessingService,
+    # PaymentProcessingService,
     WithdrawalService
 )
 from .models import (
-    Payment, Wallet, WithdrawalRequest, 
-    RefundRequest, PlatformHold
+    Payment, Wallet, WalletTransaction, WithdrawalRequest, 
+    RefundRequest, PlatformHold, Payout
 )
 from apps.orders.models import Order
 from . import serializers
 
 logger = logging.getLogger('myapp')
+from config.utils.pagination import CustomPageNumberPagination
+
 
 from apps.orders.serializers import OrderSerializerView
 
@@ -247,43 +249,6 @@ class SSLCommerzCancelView(APIView):
 
 
 
-# @method_decorator(csrf_exempt, name='dispatch')
-# class SSLCommerzFailView(APIView):
-#     """Handle SSLCommerz fail callback"""
-#     permission_classes = []
-    
-#     def post(self, request):
-#         transaction_id = request.data.get('tran_id')
-        
-#         try:
-#             payment = Payment.objects.get(transaction_id=transaction_id)
-#             payment.status = 'failed'
-#             payment.gateway_response = request.data
-#             payment.save()
-#         except Payment.DoesNotExist:
-#             pass
-        
-#         return redirect("/payment-failed")
-
-
-# @method_decorator(csrf_exempt, name='dispatch')
-# class SSLCommerzCancelView(APIView):
-#     """Handle SSLCommerz cancel callback"""
-#     permission_classes = []
-    
-#     def post(self, request):
-#         transaction_id = request.data.get('tran_id')
-        
-#         try:
-#             payment = Payment.objects.get(transaction_id=transaction_id)
-#             payment.status = 'failed'
-#             payment.gateway_response = request.data
-#             payment.save()
-#         except Payment.DoesNotExist:
-#             pass
-        
-#         return redirect("/payment-cancelled")
-
 
 # ==========================================
 # WALLET VIEWS (Vendor/Company)
@@ -306,7 +271,10 @@ class WalletView(APIView):
                 return Response({
                     "code": status.HTTP_404_NOT_FOUND,
                     "status": "failed",
-                    "message": "Store not found"
+                    "message": "Store not found",
+                    "data": {
+                        "store": "Store not found for the user"
+                    }
                 }, status=status.HTTP_404_NOT_FOUND)
             
             wallet, _ = Wallet.objects.get_or_create(store=store)
@@ -329,6 +297,32 @@ class WalletView(APIView):
                 "errors": {"server_error": [str(e)]}
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+# all wallet data retrieve via admin
+class WalletListView(APIView):
+    """Get all wallets (Admin)"""
+    permission_classes = [IsAuthenticated,IsAdminUser]  # Add admin permission
+    
+    def get(self, request):
+        try:
+            wallets = Wallet.objects.all().order_by('-updated_at')
+            pagination = CustomPageNumberPagination()
+            result_page = pagination.paginate_queryset(wallets, request, view=self)
+            serializer = serializers.WalletSerializer(result_page, many=True)
+            return pagination.get_paginated_response({
+                "code": status.HTTP_200_OK,
+                "status": "success",
+                "message": "Wallets retrieved successfully",
+                "data": serializer.data
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            logger.exception(str(e))
+            return Response({
+                "code": status.HTTP_500_INTERNAL_SERVER_ERROR,
+                "status": "failed",
+                "message": "Failed to retrieve wallets",
+                "errors": {"server_error": [str(e)]}
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class WalletTransactionsView(APIView):
     """Get wallet transaction history"""
@@ -342,7 +336,10 @@ class WalletTransactionsView(APIView):
                 return Response({
                     "code": status.HTTP_404_NOT_FOUND,
                     "status": "failed",
-                    "message": "Store not found"
+                    "message": "Store not found",
+                    "data": {
+                        "store": "Store not found for the user"
+                    }
                 }, status=status.HTTP_404_NOT_FOUND)
             
             wallet = Wallet.objects.get(store=store)
@@ -375,6 +372,34 @@ class WalletTransactionsView(APIView):
             return user.store_owner.store_owner_stores.first()
         return None
 
+
+
+# wallet transaction history view for admin
+class WalletTransactionListView(APIView):
+    """Get all wallet transaction history (Admin)"""
+    permission_classes = [IsAuthenticated, IsAdminUser]  # Add admin permission
+    
+    def get(self, request):
+        try:
+            transactions = WalletTransaction.objects.all().order_by('-created_at')
+            pagination = CustomPageNumberPagination()
+            result_page = pagination.paginate_queryset(transactions, request, view=self)
+            serializer = serializers.WalletTransactionSerializer(result_page, many=True)
+            return pagination.get_paginated_response({
+                "code": status.HTTP_200_OK,
+                "status": "success",
+                "message": "Transactions retrieved successfully",
+                "data": serializer.data
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            logger.exception(str(e))
+            return Response({
+                "code": status.HTTP_500_INTERNAL_SERVER_ERROR,
+                "status": "failed",
+                "message": "Failed to retrieve transactions",
+                "errors": {"server_error": [str(e)]}
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 # ==========================================
 # WITHDRAWAL REQUEST VIEWS
@@ -412,7 +437,8 @@ class WithdrawalRequestView(APIView):
             return Response({
                 "code": status.HTTP_400_BAD_REQUEST,
                 "status": "failed",
-                "message": str(e)
+                "message": str(e),
+                "errors": {"validation_error": [str(e)]}
             }, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             logger.exception(str(e))
@@ -466,7 +492,32 @@ class WithdrawalRequestView(APIView):
             return user.store_owner.store_owner_stores.first()
         return None
 
-
+# 
+class WithdrawalListView(APIView):
+    """Get all withdrawal requests (Admin)"""
+    permission_classes = [IsAuthenticated, IsAdminUser]  # Add admin permission
+    
+    def get(self, request):
+        try:
+            withdrawals = WithdrawalRequest.objects.all().order_by('-created_at')
+            pagination = CustomPageNumberPagination()
+            result_page = pagination.paginate_queryset(withdrawals, request, view=self)
+            serializer = serializers.WithdrawalRequestSerializer(result_page, many=True)
+            return pagination.get_paginated_response({
+                "code": status.HTTP_200_OK,
+                "status": "success",
+                "message": "Withdrawal requests retrieved successfully",
+                "data": serializer.data
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            logger.exception(str(e))
+            return Response({
+                "code": status.HTTP_500_INTERNAL_SERVER_ERROR,
+                "status": "failed",
+                "message": "Failed to retrieve withdrawal requests",
+                "errors": {"server_error": [str(e)]}
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 # ==========================================
 # ADMIN: APPROVE/REJECT WITHDRAWAL
 # ==========================================
@@ -483,7 +534,10 @@ class AdminWithdrawalActionView(APIView):
                 return Response({
                     "code": status.HTTP_400_BAD_REQUEST,
                     "status": "failed",
-                    "message": "Invalid action"
+                    "message": "Invalid action",
+                    "data": {
+                        "action": "Action must be 'approve' or 'reject'"
+                    }
                 }, status=status.HTTP_400_BAD_REQUEST)
             
             withdrawal = WithdrawalRequest.objects.get(id=withdrawal_id)
@@ -492,7 +546,10 @@ class AdminWithdrawalActionView(APIView):
                 return Response({
                     "code": status.HTTP_400_BAD_REQUEST,
                     "status": "failed",
-                    "message": "Withdrawal already processed"
+                    "message": "Withdrawal already processed",
+                    "data": {
+                        "current_status": withdrawal.status
+                    }
                 }, status=status.HTTP_400_BAD_REQUEST)
             
             if action == 'approve':
@@ -579,6 +636,32 @@ class RefundRequestView(APIView):
                 "errors": {"server_error": [str(e)]}
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             
+
+class RefundListView(APIView):
+    """Get all refund/return requests (Admin)"""
+    permission_classes = [IsAuthenticated, IsAdminUser]  # Add admin permission
+    
+    def get(self, request):
+        try:
+            refunds = RefundRequest.objects.all().order_by('-created_at')
+            pagination = CustomPageNumberPagination()
+            result_page = pagination.paginate_queryset(refunds, request, view=self)
+            serializer = serializers.RefundRequestSerializer(result_page, many=True)
+            return pagination.get_paginated_response({
+                "code": status.HTTP_200_OK,
+                "status": "success",
+                "message": "Refund requests retrieved successfully",
+                "data": serializer.data
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            logger.exception(str(e))
+            return Response({
+                "code": status.HTTP_500_INTERNAL_SERVER_ERROR,
+                "status": "failed",
+                "message": "Failed to retrieve refund requests",
+                "errors": {"server_error": [str(e)]}
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             
 # retrieve all payments made by the user
 class PaymentListView(APIView):
@@ -602,5 +685,59 @@ class PaymentListView(APIView):
                 "code": status.HTTP_500_INTERNAL_SERVER_ERROR,
                 "status": "failed",
                 "message": "Failed to retrieve payments",
+                "errors": {"server_error": [str(e)]}
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+
+class PlatformHoldListView(APIView):
+    """View platform holds (Admin)"""
+    permission_classes = [IsAuthenticated, IsAdminUser]
+    
+    def get(self, request):
+        try:
+            holds = PlatformHold.objects.all().order_by('-created_at')
+            pagination = CustomPageNumberPagination()
+            result_page = pagination.paginate_queryset(holds, request, view=self)
+            serializer = serializers.PlatformHoldSerializer(result_page, many=True)
+            return pagination.get_paginated_response({
+                "code": status.HTTP_200_OK,
+                "status": "success",
+                "message": "Platform holds retrieved successfully",
+                "data": serializer.data
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            logger.exception(str(e))
+            return Response({
+                "code": status.HTTP_500_INTERNAL_SERVER_ERROR,
+                "status": "failed",
+                "message": "Failed to retrieve platform holds",
+                "errors": {"server_error": [str(e)]}
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+
+class PayoutListView(APIView):
+    """Get all payouts (Admin)"""
+    permission_classes = [IsAuthenticated, IsAdminUser]  # Add admin permission
+    
+    def get(self, request):
+        try:
+            payouts = Payout.objects.all().order_by('-created_at')
+            pagination = CustomPageNumberPagination()
+            result_page = pagination.paginate_queryset(payouts, request, view=self)
+            serializer = serializers.PayoutSerializer(result_page, many=True)
+            return pagination.get_paginated_response({
+                "code": status.HTTP_200_OK,
+                "status": "success",
+                "message": "Payouts retrieved successfully",
+                "data": serializer.data
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            logger.exception(str(e))
+            return Response({
+                "code": status.HTTP_500_INTERNAL_SERVER_ERROR,
+                "status": "failed",
+                "message": "Failed to retrieve payouts",
                 "errors": {"server_error": [str(e)]}
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

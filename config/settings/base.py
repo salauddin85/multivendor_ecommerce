@@ -270,6 +270,14 @@ CELERY_BEAT_SCHEDULE = {
         "task": "apps.activity_log.tasks.flush_activity_logs",
         "schedule": crontab(minute="*/2"),
     },
+    'release-holds-daily': {
+        'task': 'apps.payments.tasks.release_holds_and_create_payouts',
+        'schedule': crontab(hour=2, minute=0),  # Run daily at 2 AM
+    },
+    'process-refunds-hourly': {
+        'task': 'apps.payments.tasks.process_pending_refunds',
+        'schedule': crontab(minute=0),  # Run every hour
+    },
 }
 
 # Email settings for production
