@@ -6,6 +6,11 @@ SILKY_PYTHON_PROFILER_BINARY = False
 SILKY_META = False
 
 
+# max file size settings
+FILE_UPLOAD_MAX_MEMORY_SIZE = 50 * 1024 * 1024      # 50MB per file
+DATA_UPLOAD_MAX_MEMORY_SIZE = 50 * 1024 * 1024      # 50MB total per request
+
+
 # Database
 
 DATABASES = {

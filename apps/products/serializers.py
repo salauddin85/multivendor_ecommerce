@@ -190,8 +190,14 @@ class ProductAttributeSerializer(serializers.Serializer):
         instance.save()
         return instance
 
+class ProductAttributeSerializerForView(serializers.ModelSerializer):
+    product = serializers.StringRelatedField()
+    class Meta:
+        model = models.ProductAttribute
+        fields = '__all__'
 
-class ProductAttributeSerializerView(serializers.ModelSerializer):
+
+class ProductAttributeSerializerDetailView(serializers.ModelSerializer):
     class Meta:
         model = models.ProductAttribute
         fields = '__all__'
@@ -202,6 +208,8 @@ class ProductAttributeValueSerializer(serializers.Serializer):
     attribute = serializers.PrimaryKeyRelatedField(queryset=models.ProductAttribute.objects.all())
     value = serializers.CharField()
     color_code = serializers.CharField(required=False)
+    created_at = serializers.DateTimeField(read_only=True)
+    updated_at = serializers.DateTimeField(read_only=True)
     
     def validate_value(self, value):
         value = value.strip()
@@ -222,7 +230,7 @@ class ProductAttributeValueSerializer(serializers.Serializer):
         return instance
 
 class ProductAttributeValueSerializerView(serializers.ModelSerializer):
-    attribute = ProductAttributeSerializerView()
+    attribute = ProductAttributeSerializerDetailView()
     class Meta:
         model = models.ProductAttributeValue
         fields = '__all__'

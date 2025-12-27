@@ -329,7 +329,7 @@ class ProductAttributeView(APIView):
             product_attributes = models.ProductAttribute.objects.select_related('product').all()
             paginator = CustomPageNumberPagination()
             product_attributes = paginator.paginate_queryset(product_attributes, request, view=self)
-            serializer = serializers.ProductAttributeSerializer(product_attributes, many=True)
+            serializer = serializers.ProductAttributeSerializerForView(product_attributes, many=True)
             log_request(request, "Product attributes fetched", "info", "Product attributes fetched successfully", response_status_code=status.HTTP_200_OK)
             return paginator.get_paginated_response({
                 "code": status.HTTP_200_OK,
@@ -355,7 +355,7 @@ class ProductAttributeDetailView(APIView):
     def get(self, request, pk):
         try:
             pa = models.ProductAttribute.objects.select_related('product').get(pk=pk)
-            serializer = serializers.ProductAttributeSerializerView(pa)
+            serializer = serializers.ProductAttributeSerializerDetailView(pa)
             log_request(request, f"Product attribute {pk} fetched", "info",
                         "Product attribute fetched successfully", response_status_code=status.HTTP_200_OK)
             return Response({
