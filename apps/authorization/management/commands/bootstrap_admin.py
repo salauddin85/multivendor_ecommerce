@@ -32,6 +32,7 @@ class Command(BaseCommand):
 
             user, created = User.objects.get_or_create(
                 email=admin_email,
+                user_type="admin",
                 defaults={"is_superuser": True, "is_staff": True}
             )
             if created:
