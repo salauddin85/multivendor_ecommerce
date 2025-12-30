@@ -15,7 +15,7 @@ from config.utils.pagination import CustomPageNumberPagination
 
 
 class CategoriesView(APIView):
-    permission_classes = [IsAuthenticated,IsAdminUser]
+    permission_classes = [IsAuthenticated]
     
     def post(self, request):
        try:
@@ -197,6 +197,7 @@ class CategoryTreeView(APIView):
 
 
 class BrandsView(APIView):
+    
     def post(self, request):
         try:
             data = request.data
