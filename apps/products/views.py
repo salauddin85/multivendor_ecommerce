@@ -11,6 +11,7 @@ from django.db import transaction
 from rest_framework.permissions import IsAuthenticated,IsAdminUser,AllowAny
 from config.utils.pagination import CustomPageNumberPagination
 from .filters import ProductFilter
+from django.db.models import Q
 
 
 
@@ -61,39 +62,141 @@ class ProductsView(APIView):
                 }
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+    # def get(self, request):
+    #     try:
+    #         queryset = models.Product.objects.select_related('store', 'category', 'brand').filter(status='draft')
+            
+    #         brand_slug = request.GET.get("brand")
+    #         category_slug = request.GET.get("category")
+    #         search = request.GET.get("search")
+            
+            
+    #         filters = Q()
+    #         if brand_slug:
+    #             filters &= Q(brand__slug=brand_slug)
+
+    #         if category_slug:
+    #             filters &= Q(category__slug=category_slug)
+
+    #         if search:
+    #             filters &= Q(title__icontains=search)
+    #         if brand_slug or category_slug or search:
+    #             queryset = queryset.filter(filters)
+
+            
+    #         filter_set = ProductFilter(request.GET, queryset=queryset)
+    #         products = filter_set.qs
+    #         paginator = CustomPageNumberPagination()
+    #         products = paginator.paginate_queryset(products, request, view=self)
+    #         fields = request.GET.get('fields')
+    #         if fields:
+    #             fields = fields.split(',')
+    #             serializer = serializers.ProductSerializerView(products, many=True, fields=fields)
+    #         else:
+    #             serializer = serializers.ProductSerializerView(products, many=True)
+
+    #         log_request(request, "Products fetched", "info", "Products fetched successfully", response_status_code=status.HTTP_200_OK)
+    #         return paginator.get_paginated_response({
+    #             "code": status.HTTP_200_OK,
+    #             "status": "success",
+    #             "message": "Products fetched successfully",
+    #             "data": serializer.data
+    #         }, status=status.HTTP_200_OK)
+    #     except Exception as e:
+    #         logger.exception(str(e))
+    #         log_request(request, "Product fetch failed", "error", "Product fetch failed due to server error", response_status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    #         return Response({
+    #             "code": status.HTTP_500_INTERNAL_SERVER_ERROR,
+    #             "status": "error",
+    #             "message": "Product fetch failed due to server error",
+    #             "errors": {
+    #                 'server_error': [str(e)]
+    #             }
+    #         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
     def get(self, request):
         try:
-            products = models.Product.objects.select_related('store', 'category', 'brand').filter(status='draft')
-            filter_set = ProductFilter(request.GET, queryset=products)
-            products = filter_set.qs
+            queryset = (
+                models.Product.objects
+                .select_related("store", "category", "brand")
+                .filter(status="draft")
+            )
+
+            # --------------------
+            # Query Params
+            # --------------------
+            brand = request.GET.get("brand")
+            category = request.GET.get("category")
+            search = request.GET.get("search")
+            title = request.GET.get("title")
+            store = request.GET.get("store")
+            min_price = request.GET.get("min_price")
+            max_price = request.GET.get("max_price")
+
+            filters = Q()
+
+            # --------------------
+            # Slug based filters
+            # --------------------
+            if brand:
+                filters &= Q(brand__slug=brand)
+
+            if category:
+                filters &= Q(category__slug=category)
+
+            # --------------------
+            # Text search
+            # --------------------
+            if search:
+                filters &= Q(title__icontains=search)
+
+            if title:
+                filters &= Q(title__icontains=title)
+
+            if store:
+                filters &= Q(store__store_name__icontains=store)
+
+            # --------------------
+            # Price range
+            # --------------------
+            if min_price:
+                filters &= Q(base_price__gte=min_price)
+
+            if max_price:
+                filters &= Q(base_price__lte=max_price)
+
+            if filters:
+                queryset = queryset.filter(filters)
+
+            # --------------------
+            # Pagination & Serialize
+            # --------------------
             paginator = CustomPageNumberPagination()
-            products = paginator.paginate_queryset(products, request, view=self)
-            fields = request.GET.get('fields')
+            products = paginator.paginate_queryset(queryset, request, view=self)
+
+            fields = request.GET.get("fields")
             if fields:
-                fields = fields.split(',')
-                serializer = serializers.ProductSerializerView(products, many=True, fields=fields)
+                serializer = serializers.ProductSerializerView(
+                    products, many=True, fields=fields.split(",")
+                )
             else:
                 serializer = serializers.ProductSerializerView(products, many=True)
 
-            log_request(request, "Products fetched", "info", "Products fetched successfully", response_status_code=status.HTTP_200_OK)
             return paginator.get_paginated_response({
-                "code": status.HTTP_200_OK,
+                "code": 200,
                 "status": "success",
                 "message": "Products fetched successfully",
                 "data": serializer.data
-            }, status=status.HTTP_200_OK)
+            })
+
         except Exception as e:
             logger.exception(str(e))
-            log_request(request, "Product fetch failed", "error", "Product fetch failed due to server error", response_status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
             return Response({
-                "code": status.HTTP_500_INTERNAL_SERVER_ERROR,
+                "code": 500,
                 "status": "error",
-                "message": "Product fetch failed due to server error",
-                "errors": {
-                    'server_error': [str(e)]
-                }
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
+                "message": "Product fetch failed",
+                "errors": {"server_error": [str(e)]}
+            }, status=500)
 class ProductsDetailView(APIView):
     # permission_classes = [IsAuthenticated]
 
