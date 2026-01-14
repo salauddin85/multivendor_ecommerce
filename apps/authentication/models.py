@@ -78,7 +78,7 @@ class Vendor(models.Model):
     status = models.CharField(max_length=50, choices=USER_STATUS_CHOICES, default="pending")  
     
     def __str__(self):
-        return f"Vendor: {self.user.email}"
+        return self.user.email
 
 class StoreOwner(models.Model):
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE,related_name='store_owner_profile')
@@ -90,7 +90,7 @@ class StoreOwner(models.Model):
     status = models.CharField(max_length=50, choices=USER_STATUS_CHOICES, default="pending") 
     
     def __str__(self):
-        return f"Store Owner: {self.user.email}"
+        return self.user.email
 
 
 

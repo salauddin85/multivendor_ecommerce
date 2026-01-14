@@ -8,6 +8,8 @@ import logging
 logger = logging.getLogger("myapp")
 from rest_framework.permissions import IsAuthenticated,IsAdminUser
 from config.utils.pagination import CustomPageNumberPagination
+from django.db.models import Q
+
 
 
 class StoresView(APIView):
@@ -32,76 +34,89 @@ class StoresView(APIView):
             log_request(request, "Store fetch failed", "error","Store fetch failed due to server error", response_status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)    
             return Response({
                 "code": status.HTTP_500_INTERNAL_SERVER_ERROR,
-                "status": "error",
+                "status": "failed",
                 "message": "Store fetch failed due to server error",
-                "data": None
+                "errors": {
+                    "server_error": [str(e)]
+                }
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-
-class  OwnStoreView(APIView):
+class OwnStoreView(APIView):
     permission_classes = [IsAuthenticated]
-    
-    
-    def get(self,request):
+
+    def get(self, request):
+        user = request.user
+        
+        stores_qs = models.Store.objects.select_related('vendor', 'store_owner').filter(
+            Q(vendor__user=user) | Q(store_owner__user=user)
+        ).distinct()
+
+        # check if empty using the same queryset (exists() will hit DB once)
+        if not stores_qs.exists():
+             return Response({
+                "code": status.HTTP_404_NOT_FOUND,
+                "status": "failed",
+                "message": "No stores found",
+                "data": []
+            }, status=status.HTTP_404_NOT_FOUND)
+
+        serializer = serializers.StoreSerializerForView(stores_qs, many=True)
+        
+        return Response({
+            "code": status.HTTP_200_OK,
+            "status": "success",
+            "message": "Stores fetched successfully",
+            "data": serializer.data
+        }, status=status.HTTP_200_OK)
+
+    def patch(self, request):
         try:
+           
             user = request.user
-            # Collect stores related to the authenticated user
-            stores_qs = models.Store.objects.none()
-
-            # Vendor account -> stores where vendor matches
-            try:
-                if hasattr(user, 'vendor_profile'):
-                    stores_qs = stores_qs | models.Store.objects.filter(vendor__user=user)
-            except Exception:
-                # defensive: ignore if vendor_profile relation not present
-                pass
-
-            # Store owner account -> stores where store_owner matches
-            try:
-                if hasattr(user, 'store_owner_profile'):
-                    stores_qs = stores_qs | models.Store.objects.filter(store_owner__user=user)
-            except Exception:
-                pass
-
-            if not stores_qs.exists():
-                log_request(request, f"Own store {user.email} fetch", "info", "No stores found for user", response_status_code=status.HTTP_404_NOT_FOUND)
+            store_qs = models.Store.objects.filter(
+                Q(vendor__user=user) | Q(store_owner__user=user)
+            ).distinct()
+            if not store_qs.exists():
+                log_request(request, "Store update failed", "warning", "No store found for the user", response_status_code=status.HTTP_404_NOT_FOUND)
                 return Response({
                     "code": status.HTTP_404_NOT_FOUND,
-                    "status": "fail",
-                    "message": "No stores found for the authenticated user",
+                    "status": "failed",
+                    "message": "No store found for the user",
                     "data": []
                 }, status=status.HTTP_404_NOT_FOUND)
-
-            serializer = serializers.StoreSerializerForView(stores_qs.distinct(), many=True)
-            log_request(request, f" {user.email} own stores fetched", "info", " stores fetched successfully", response_status_code=status.HTTP_200_OK)
-            return Response({
-                "code": status.HTTP_200_OK,
-                "status": "success",
-                "message": "Stores fetched successfully",
-                "data": serializer.data
-            }, status=status.HTTP_200_OK)
-            
-            
-        except models.Store.DoesNotExist:
-            log_request(request, "Vendor store fetch failed", "warning", "Store not found for user", response_status_code=status.HTTP_404_NOT_FOUND)
-            return Response({
-                "code": status.HTTP_404_NOT_FOUND,
-                "status": "fail",
-                "message": "Store not found for the authenticated user",
-                "data": None
-            }, status=status.HTTP_404_NOT_FOUND)
+            serializer = serializers.StoreUpdateSerializer(data=request.data, instance=store_qs.first(), partial=True)
+            if serializer.is_valid():
+                store = serializer.save()
+                log_request(request, "Store updated", "info", "Store updated successfully", response_status_code=status.HTTP_200_OK)
+                return Response({
+                    "code": status.HTTP_200_OK,
+                    "status": "success",
+                    "message": "Store updated successfully",
+                    "data": serializer.data
+                }, status=status.HTTP_200_OK)
+            else:
+                log_request(request, "Store update failed", "warning", "Invalid data for store update", response_status_code=status.HTTP_400_BAD_REQUEST)
+                return Response({
+                    "code": status.HTTP_400_BAD_REQUEST,
+                    "status": "failed",
+                    "message": "Invalid data",
+                    "data": serializer.errors
+                }, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             logger.exception(str(e))
-            log_request(request, "Vendor store fetch error", "error", "Error fetching vendor store(s)", response_status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            log_request(request, "Store update error", "error", "Error updating store", response_status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
             return Response({
                 "code": status.HTTP_500_INTERNAL_SERVER_ERROR,
-                "status": "error",
-                "message": "Error fetching store(s) due to server error",
-                "data": None
+                "status": "failed",
+                "message": "Store update failed due to server error",
+                "errors": {
+                    "server_error": [str(e)]
+                }
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-
+    
+    
 
 class CommissionRatesView(APIView):
     permission_classes = [IsAuthenticated,IsAdminUser]

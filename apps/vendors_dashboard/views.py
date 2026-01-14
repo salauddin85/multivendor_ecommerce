@@ -16,6 +16,7 @@ from apps.products.serializers import (ProductSerializerView,ProductVariantSeria
                                        ProductAttributeValueSerializer)
 
 from apps.stores.models import Store
+from apps.authentication.models import Vendor
 #  ---------------------------------------------------------------------------
 
 
@@ -292,3 +293,44 @@ class VendorProductAttributeValuesView(APIView):
                 }
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+
+
+
+class VendorOwnProfileView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            user = request.user
+            vendor = Vendor.objects.select_related('user').filter(user=user).first()
+            serializer = serializers.VendorProfileSerializer(vendor)
+            log_request(
+                request,
+                "Vendor profile retrieved",
+                "info",
+                "Vendor profile retrieved successfully",
+                response_status_code=status.HTTP_200_OK
+            )
+            return Response({
+                "code": status.HTTP_200_OK,
+                "status": "success",
+                "message": "Vendor profile retrieved successfully",
+                "data": serializer.data
+            }, status=status.HTTP_200_OK)
+        except Exception as e:
+            logger.exception(str(e))
+            log_request(
+                request,
+                "Vendor profile retrieval failed",
+                "error",
+                f"Vendor profile retrieval failed due to server error: {str(e)}",
+                response_status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+            return Response({
+                "code": status.HTTP_500_INTERNAL_SERVER_ERROR,
+                "status": "failed",
+                "message": "Internal server error",
+                "errors": {
+                    "server_error": [str(e)]
+                }
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

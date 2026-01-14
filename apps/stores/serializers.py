@@ -15,7 +15,7 @@ class StoreSerializer(serializers.ModelSerializer):
 		model = Store
 		fields = [
 			'id', 'store_owner', 'vendor', 'store_name', 'slug', 'type',
-			'logo', 'banner', 'address', 'description', 'commission_rate',
+			'logo', 'banner', 'address', 'description', 
 			'is_verified', 'status', 'created_at', 'updated_at'
 		]
 		read_only_fields = ('id', 'slug', 'created_at', 'updated_at')
@@ -33,22 +33,14 @@ class StoreSerializer(serializers.ModelSerializer):
 		store = Store.objects.create(**validated_data)
 		return store
 
-	def update(self, instance, validated_data):
-		instance.store_owner = validated_data.get('store_owner', instance.store_owner)
-		instance.vendor = validated_data.get('vendor', instance.vendor)
-		instance.store_name = validated_data.get('store_name', instance.store_name)
-		instance.type = validated_data.get('type', instance.type)
-		instance.logo = validated_data.get('logo', instance.logo)
-		instance.banner = validated_data.get('banner', instance.banner)
-		instance.address = validated_data.get('address', instance.address)
-		instance.description = validated_data.get('description', instance.description)
-		instance.commission_rate = validated_data.get('commission_rate', instance.commission_rate)
-		instance.is_verified = validated_data.get('is_verified', instance.is_verified)
-		instance.status = validated_data.get('status', instance.status)
-		instance.updated_at = timezone.now()
-		instance.save()
-		return instance
 
+
+class StoreUpdateSerializer(serializers.ModelSerializer):
+	class Meta:
+		model = Store
+		fields = [
+			'store_name', 'logo', 'banner', 'address', 'description','slug'
+		]
 
 # class StoreSerializerForView(serializers.ModelSerializer):
 # 	class Meta:
@@ -61,10 +53,16 @@ class StoreSerializer(serializers.ModelSerializer):
 # 		read_only_fields = fields
 
 
+
+
 class StoreSerializerForView(serializers.ModelSerializer):
+    vendor = serializers.StringRelatedField()
+    store_owner = serializers.StringRelatedField()
+    
     class Meta:
         model = Store
         fields = '__all__'
+        # depth = 1
         
 
 class CommissionRateSerializer(serializers.Serializer):
