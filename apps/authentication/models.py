@@ -117,7 +117,8 @@ class RegisterVerificationSuccessfulEmail(models.Model):
 
 class Staff(models.Model):
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='staff_profile')
-    store_owner = models.ForeignKey(StoreOwner, on_delete=models.CASCADE, related_name='staff_members')
+    store_owner = models.ForeignKey(StoreOwner, on_delete=models.CASCADE, related_name='staff_members', null=True, blank=True)
+    vendor = models.ForeignKey(Vendor, on_delete=models.CASCADE, related_name='staff_members', null=True, blank=True)
     phone_number = models.CharField(max_length=15, blank=True, null=True)
     nid_card_image = models.ImageField(upload_to='staff/nid_cards/', blank=True, null=True)
 

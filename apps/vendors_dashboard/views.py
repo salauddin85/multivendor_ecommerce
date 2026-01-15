@@ -16,7 +16,7 @@ from apps.products.serializers import (ProductSerializerView,ProductVariantSeria
                                        ProductAttributeValueSerializer)
 
 from apps.stores.models import Store
-from apps.authentication.models import Vendor
+from apps.authentication.models import Vendor,Staff
 #  ---------------------------------------------------------------------------
 
 
@@ -324,6 +324,46 @@ class VendorOwnProfileView(APIView):
                 "Vendor profile retrieval failed",
                 "error",
                 f"Vendor profile retrieval failed due to server error: {str(e)}",
+                response_status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+            return Response({
+                "code": status.HTTP_500_INTERNAL_SERVER_ERROR,
+                "status": "failed",
+                "message": "Internal server error",
+                "errors": {
+                    "server_error": [str(e)]
+                }
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+
+class VendorAllOwnStaffView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            user = request.user
+            staff_members = Staff.objects.select_related('user').filter(vendor__user=user)
+            serializer = serializers.StaffSerializerForView(staff_members, many=True)
+            log_request(
+                request,
+                "Vendor staff members retrieved",
+                "info",
+                "Vendor staff members retrieved successfully",
+                response_status_code=status.HTTP_200_OK
+            )
+            return Response({
+                "code": status.HTTP_200_OK,
+                "status": "success",
+                "message": "Vendor staff members retrieved successfully",
+                "data": serializer.data
+            }, status=status.HTTP_200_OK)
+        except Exception as e:
+            logger.exception(str(e))
+            log_request(
+                request,
+                "Vendor staff members retrieval failed",
+                "error",
+                f"Vendor staff members retrieval failed due to server error: {str(e)}",
                 response_status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
             return Response({

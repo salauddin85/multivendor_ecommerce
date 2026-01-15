@@ -9,6 +9,7 @@ from apps.authentication.validators import SimplePasswordValidator
 import phonenumbers
 from django.utils import timezone
 from datetime import timedelta
+from django.db import transaction
 
 
 
@@ -284,34 +285,56 @@ class StaffOnboardingRegistrationSerializer(serializers.Serializer):
             raise serializers.ValidationError("Invalid phone number format. Use +<countrycode><number>.")
         
         return phonenumbers.format_number(phone, phonenumbers.PhoneNumberFormat.E164)
-        
-    
+
+
     def validate(self, attrs):
-        user = self.context.get("requester")
-        store_owner = StoreOwner.objects.filter(user=user).first()
-        if not store_owner:
-            raise serializers.ValidationError("Only store owners can onboard staff members.")
+        requester = self.context.get("requester")
+
+        store_owner = StoreOwner.objects.filter(user=requester).first()
+        vendor = Vendor.objects.filter(user=requester).first()
+
+        #  both cannot exist
+        if store_owner and vendor:
+            raise serializers.ValidationError(
+                "User cannot be both Vendor and Store Owner."
+            )
+
+        if not store_owner and not vendor:
+            raise serializers.ValidationError(
+                "Only Vendor or Store Owner can onboard staff."
+            )
+
         attrs["store_owner"] = store_owner
-        return super().validate(attrs)
+        attrs["vendor"] = vendor
+        return attrs
 
 
     def create(self, validated_data):
-        email = validated_data.get('email')
-        password = validated_data.get('password')
-        first_name = validated_data.get('first_name','')
-        last_name = validated_data.get('last_name','')
-        store_owner = validated_data.get('store_owner')
-        phone_number = validated_data.get('phone_number','')
-        nid_card_image = validated_data.get('nid_card_image',None)
+        with transaction.atomic():
 
-        
+            user = CustomUser.objects.create_user(
+                email=validated_data["email"],
+                password=validated_data["password"],
+                first_name=validated_data.get("first_name", ""),
+                last_name=validated_data.get("last_name", ""),
+                user_type="staff",
+            )
 
-        user = CustomUser.objects.create_user(
-            first_name = first_name,
-            last_name = last_name,
-            email=email, password=password,user_type='staff')
-        Staff.objects.create(user = user,store_owner=store_owner,phone_number=phone_number,nid_card_image=nid_card_image)
-        return user
+            staff_data = {
+                "user": user,
+                "phone_number": validated_data.get("phone_number", ""),
+                "nid_card_image": validated_data.get("nid_card_image"),
+            }
+
+            if validated_data.get("vendor"):
+                staff_data["vendor"] = validated_data["vendor"]
+
+            elif validated_data.get("store_owner"):
+                staff_data["store_owner"] = validated_data["store_owner"]
+
+            Staff.objects.create(**staff_data)
+
+            return user
 
 
 

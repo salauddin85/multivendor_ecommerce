@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from apps.authentication.models import Vendor,CustomUser
+from apps.authentication.models import Vendor,CustomUser,Staff
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -14,3 +14,11 @@ class VendorProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = Vendor
         fields = "__all__"
+        
+
+class StaffSerializerForView(serializers.ModelSerializer):
+    user = UserSerializer(read_only=True)
+
+    class Meta:
+        model = Staff
+        fields = ["id", "user", "phone_number", "nid_card_image"]

@@ -119,7 +119,7 @@ class ProductsView(APIView):
             queryset = (
                 models.Product.objects
                 .select_related("store", "category", "brand")
-                .filter(status="draft")
+                .filter(Q(status="draft") | Q(status="published"))
             )
 
             # --------------------
