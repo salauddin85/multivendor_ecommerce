@@ -6,6 +6,8 @@ from django.conf import settings
 from django_redis import get_redis_connection
 import json
 from config.celery import app
+from django.utils import timezone
+from datetime import timedelta
 
 
 logger = logging.getLogger("myapp")
@@ -125,3 +127,16 @@ def flush_activity_logs():
             ActivityLog.objects.bulk_create(logs_to_create[i:i+100])
         return f"{len(logs_to_create)} logs flushed"
     return "No logs to flush"
+
+
+
+
+@app.task
+def delete_activity_logs_older_than_one_month():
+    cutoff_date = timezone.now() - timedelta(days=30)
+
+    # Bulk delete in a single SQL query
+    deleted_count, _ = ActivityLog.objects.filter(
+        timestamp__lt=cutoff_date).delete()
+
+    return f"Deleted {deleted_count} old activity logs"

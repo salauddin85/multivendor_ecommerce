@@ -270,6 +270,10 @@ CELERY_BEAT_SCHEDULE = {
         "task": "apps.activity_log.tasks.flush_activity_logs",
         "schedule": crontab(minute="*/2"),
     },
+    "delete-activity-logs-daily-midnight": {
+        "task": "apps.activity_log.tasks.delete_activity_logs_older_than_one_month",
+        "schedule": crontab(minute=0, hour=0),  # 12:00 AM daily
+    },
     'release-holds-daily': {
         'task': 'apps.payments.tasks.release_holds_and_create_payouts',
         'schedule': crontab(hour=2, minute=0),  # Run daily at 2 AM

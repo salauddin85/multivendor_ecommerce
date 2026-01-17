@@ -34,7 +34,7 @@ urlpatterns = [
     path('api/notifications/',include('apps.notifications.urls')),
     path('api/wishlist/',include('apps.wishlist.urls')),
     path('api/coupons/',include('apps.coupons.urls')),
-    # path('api/activity_log/',include('apps.activity_log.urls')),
+    path('api/activity_log/',include('apps.activity_log.urls')),
     # path('api/reviews/',include('apps.review.urls')),
     path('api/vendors_dashboard/',include('apps.vendors_dashboard.urls')),
     

@@ -239,7 +239,7 @@ class StaffOnboardingSerializer(serializers.Serializer):
             otp_instance = OTP.objects.get(email=email)
             otp_instance.otp = otp
             otp_instance.is_expired = timezone.now()
-            otp_instance.save(update_fields=["otp", "is_expired"])
+            otp_instance.save(update_fields=["otp", "expire_time"])
         else:
             otp_instance = OTP.objects.create(email=email, otp=otp)
         return otp_instance
