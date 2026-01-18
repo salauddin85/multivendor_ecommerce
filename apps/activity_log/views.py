@@ -8,8 +8,6 @@ from . import serializers
 from .models import *
 from config.utils.pagination import CustomPageNumberPagination
 from .utils.permissions import ActivityLogManagementPermission
-
-
 logger = logging.getLogger("myapp")
 
 

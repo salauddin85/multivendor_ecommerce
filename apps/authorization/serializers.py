@@ -361,14 +361,14 @@ class VendorSerializer(serializers.ModelSerializer):
         # depth = 1
         
 class CustomerSerializer(serializers.ModelSerializer):
-    user = serializers.StringRelatedField()
+    user = UserSerializer(read_only=True)
     class Meta:
         model = Customer
         fields = "__all__"
         # depth = 1
 
 class StoreOwnerSerializer(serializers.ModelSerializer):
-    user = serializers.StringRelatedField()
+    user = UserSerializer(read_only=True)
     class Meta:
         model = StoreOwner
         fields = "__all__"

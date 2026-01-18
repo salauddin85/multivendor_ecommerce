@@ -1045,7 +1045,7 @@ class AllStoreOwnerListView (APIView):
             paginator = CustomPageNumberPagination()
             paginated_queryset = paginator.paginate_queryset(
                 store_owners, request, view=self)
-            serializer = serializers.StoreOwnerSerializer(store_owners, many=True)
+            serializer = serializers.StoreOwnerSerializer(paginated_queryset, many=True)
             log_request(request, "Fetched all store owners", "info", "All store owners fetched successfully", response_status_code=status.HTTP_200_OK)
             return paginator.get_paginated_response({
                 "code": status.HTTP_200_OK,

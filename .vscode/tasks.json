@@ -1,0 +1,37 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+        "label": "Run Django",
+        "type": "shell",
+        "command": "python manage.py runserver",
+        "problemMatcher": []
+    },
+    {
+        "label": "Run Celery Worker",
+        "type": "shell",
+        "command": "celery -A config.celery worker --pool=solo -l info",
+        "problemMatcher": []
+    },
+    {
+        "label": "Run Celery Beat",
+        "type": "shell",
+        "command": "celery -A config beat -l INFO --scheduler django_celery_beat.schedulers:DatabaseScheduler",
+        "problemMatcher": []
+    },
+    {
+        "label": " Run All",
+        "dependsOn": [
+            "Run Django",
+            "Run Celery Worker",
+            "Run Celery Beat"
+        ],
+        "dependsOrder": "parallel",
+        "problemMatcher": [],
+        "group": {
+            "kind": "build",
+            "isDefault": true
+        }
+    }
+]
+}
