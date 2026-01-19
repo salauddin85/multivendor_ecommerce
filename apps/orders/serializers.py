@@ -117,6 +117,7 @@ class OrderSerializer(serializers.Serializer):
     customer_note = serializers.CharField(required=False, allow_blank=True)
     items = OrderItemInputSerializer(many=True)
     coupon_code = serializers.CharField(required=False, allow_blank=True)
+    payment_method = serializers.CharField(required=False, default='cash_on_delivery')
 
     # =========================
     # ADDRESS OWNERSHIP CHECK
@@ -138,7 +139,8 @@ class OrderSerializer(serializers.Serializer):
 
         items_data = validated_data.pop("items")
         coupon_code = validated_data.pop("coupon_code", "").strip()
-
+        payment_method = validated_data.pop('payment_method', 'cash_on_delivery')
+        address = validated_data["shipping_address"]
         subtotal = Decimal("0.00")
 
         # =========================
@@ -157,7 +159,16 @@ class OrderSerializer(serializers.Serializer):
             subtotal += price * qty
         # =========================
         # SHIPPING, TAX, DISCOUNT
-        shipping_fee = Decimal("50.00")
+        # shipping_fee = Decimal("50.00")
+        try:
+            if address.city.lower() == "dhaka":
+                config = models.ShippingConfiguration.objects.get(location_name__icontains="Inside Dhaka")
+            else:
+                config = models.ShippingConfiguration.objects.get(location_name__icontains="Outside Dhaka")
+            shipping_fee = config.shipping_fee
+        except models.ShippingConfiguration.DoesNotExist:
+            shipping_fee = Decimal("0.00")
+        # =========================
         tax = Decimal("0.00")
         discount = Decimal("0.00")
         applied_coupon = None
@@ -210,6 +221,8 @@ class OrderSerializer(serializers.Serializer):
             tax=tax,
             discount=discount,
             total_amount=total_amount,
+            payment_method=payment_method,
+            payment_status='paid' if payment_method == 'online_payment' else 'unpaid',
             shipping_address=validated_data["shipping_address"],
             customer_note=validated_data.get("customer_note", ""),
             coupon=applied_coupon

@@ -33,6 +33,13 @@ class ShippingAddress(OrderBaseModel):
     
     def __str__(self):
         return self.name
+    
+class ShippingConfiguration(OrderBaseModel):
+    location_name = models.CharField(max_length=100, unique=True, help_text="e.g. Inside Dhaka, Outside Dhaka")
+    shipping_fee = models.DecimalField(max_digits=10, decimal_places=2)
+
+    def __str__(self):
+        return f"{self.location_name}: {self.shipping_fee}"
 
 
 class Order(OrderBaseModel):
@@ -52,7 +59,15 @@ class Order(OrderBaseModel):
     payment_method = models.CharField(max_length=50, blank=True, null=True)
     shipping_address = models.ForeignKey(ShippingAddress, on_delete=models.SET_NULL, null=True,blank=True, related_name='orders')
     customer_note = models.TextField(blank=True, null=True)
-  
+    payment_method = models.CharField(
+        max_length=30, 
+        choices=[
+            ('cash_on_delivery', 'Cash on Delivery'),
+            ('online_payment', 'Online Payment'),
+            ('bank_transfer', 'Bank Transfer'),
+        ],
+        default='cash_on_delivery'
+    )
     
     class Meta:
         ordering = ['-created_at']

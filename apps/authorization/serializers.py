@@ -354,7 +354,7 @@ class StaffSerializer(serializers.ModelSerializer):
         # depth = 1   
         
 class VendorSerializer(serializers.ModelSerializer):
-    user = serializers.StringRelatedField()
+    user = UserSerializer(read_only=True)
     class Meta:
         model = Vendor
         fields = "__all__"
