@@ -18,7 +18,7 @@ class ProductBaseModel(models.Model):
 
 # Product Model
 class Product(ProductBaseModel):
-    store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name="products",db_index=True)
+    store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name="products",db_index=True, null=True, blank=True)
     category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, blank=True, db_index=True)
     brand = models.ForeignKey(Brand, on_delete=models.SET_NULL, null=True, blank=True, db_index=True)
     title = models.CharField(max_length=500)

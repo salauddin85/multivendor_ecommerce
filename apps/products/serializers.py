@@ -34,7 +34,7 @@ class ProductImageSerializerView(serializers.ModelSerializer):
 
 
 class ProductSerializer(serializers.Serializer):
-    store = serializers.PrimaryKeyRelatedField(queryset=Store.objects.all())
+    store = serializers.PrimaryKeyRelatedField(queryset=Store.objects.all(), required=False, allow_null=True)
     category = serializers.PrimaryKeyRelatedField(queryset=Category.objects.all())
     brand = serializers.PrimaryKeyRelatedField(queryset=Brand.objects.all(), required=False, allow_null=True)
     title = serializers.CharField()
@@ -58,7 +58,7 @@ class ProductSerializer(serializers.Serializer):
     @transaction.atomic
     def create(self, validated_data):
         try:
-            store = validated_data.get('store')
+            store = validated_data.get('store', None)
             category = validated_data.get('category')
             brand = validated_data.get('brand', None)
             title = validated_data.get('title')
