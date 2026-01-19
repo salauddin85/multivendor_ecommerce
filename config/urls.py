@@ -37,6 +37,8 @@ urlpatterns = [
     path('api/activity_log/',include('apps.activity_log.urls')),
     # path('api/reviews/',include('apps.review.urls')),
     path('api/vendors_dashboard/',include('apps.vendors_dashboard.urls')),
+    path('api/admin_dashboard/',include('apps.admin_dashboard.urls')),
+    path('api/company_dashboard/',include('apps.company_dashboard.urls')),
     
 
 

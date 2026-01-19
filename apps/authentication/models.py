@@ -64,7 +64,7 @@ class Customer(models.Model):
     phone_number = models.CharField(max_length=15)
     
     def __str__(self):
-        return f"Customer: {self.user.email}"
+        return self.user.email
 
 
 class Vendor(models.Model):
@@ -123,4 +123,4 @@ class Staff(models.Model):
     nid_card_image = models.ImageField(upload_to='staff/nid_cards/', blank=True, null=True)
 
     def __str__(self):
-        return f"Staff: {self.user.email}"
+        return self.user.email
