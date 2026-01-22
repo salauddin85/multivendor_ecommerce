@@ -62,15 +62,7 @@ class Order(OrderBaseModel):
     shipping_address = models.ForeignKey(ShippingAddress, on_delete=models.SET_NULL, null=True,blank=True, related_name='orders')
     customer_note = models.TextField(blank=True, null=True)
     payment_type = models.CharField(max_length=50, default='')
-    payment_method = models.CharField(
-        max_length=30, 
-        choices=[
-            ('cash_on_delivery', 'Cash on Delivery'),
-            ('online_payment', 'Online Payment'),
-            ('bank_transfer', 'Bank Transfer'),
-        ],
-        default='cash_on_delivery'
-    )
+    payment_method = models.CharField(max_length=30, default='')
     
     class Meta:
         ordering = ['-created_at']

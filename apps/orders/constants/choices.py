@@ -1,5 +1,7 @@
 STATUS_CHOICES = [
         ('pending', 'Pending'),
+        ('confirmed', 'Confirmed'),
+        ('packed', 'Packed'),
         ('processing', 'Processing'),
         ('shipped', 'Shipped'),
         ('delivered', 'Delivered'),

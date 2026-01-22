@@ -46,7 +46,7 @@ class SSLCommerzService:
         if existing_payment:
             return {
                 'success': True,
-                'payment_url': existing_payment.gateway_response.get('GatewayPageURL'),
+                'payment_url': existing_payment.gateway_response.get('gateway_page_url'),
                 'transaction_id': existing_payment.transaction_id
             }
         
@@ -108,7 +108,8 @@ class SSLCommerzService:
                 "sessionkey": response.get("sessionkey"),
                 "gateway_page_url": response.get("GatewayPageURL"),
                 "initiated_at": timezone.now().isoformat()
-            }
+            }   
+            # payment.gateway_response = response
             payment.save()
             
             return {
@@ -124,6 +125,7 @@ class SSLCommerzService:
                 "tran_id": request.data.get("tran_id"),
                 "reason": request.data.get("failedreason", "User cancelled")
             }
+            # payment.gateway_response = response
 
             payment.save()
             
@@ -172,12 +174,13 @@ class SSLCommerzService:
                     order.payment_status = 'paid'
                     order.status = 'confirmed'
                     order.payment_type = f'sslcommerz_{card_type}'
+                    order.payment_method = 'online_payment'
                     order.save()
                     
                     # Create platform holds
                     PaymentProcessingService.create_platform_holds(order)
                 
-                return {'success': True, 'order': payment.order}
+                return {'success': True, 'order': payment.order, 'payment': payment}
             else:
                 payment.status = 'failed'
                 payment.gateway_response = validation

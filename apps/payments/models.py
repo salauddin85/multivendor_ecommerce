@@ -24,6 +24,7 @@ class Payment(PaymentBaseModel):
     """Main payment record for customer orders"""
     
     PAYMENT_STATUS = (
+        
         ('pending', 'Pending'),
         ('processing', 'Processing'),
         ('completed', 'Completed'),

@@ -1,6 +1,11 @@
+from decimal import Decimal
+from requests import request
 from rest_framework import serializers
 from .models import Coupon, CouponUsage
 from django.utils import timezone
+from apps.orders.models import Order
+from apps.coupons.models import Coupon, CouponUsage
+
 
 
 class CouponCreateSerializer(serializers.Serializer):
@@ -74,3 +79,12 @@ class CouponDetailSerializer(serializers.ModelSerializer):
             'usage_count', 'valid_from', 'valid_to',
             'status', 'created_at', 'usages'
         ]
+        
+        
+class CouponApplySerializer(serializers.Serializer):
+    code = serializers.CharField(max_length=50)
+    order = serializers.PrimaryKeyRelatedField(
+        queryset=Order.objects.all()
+    )
+    
+    

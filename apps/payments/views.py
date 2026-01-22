@@ -46,7 +46,8 @@ class InitiatePaymentView(APIView):
                 return Response({
                     "code": status.HTTP_400_BAD_REQUEST,
                     "status": "failed",
-                    "message": "Order ID is required"
+                    "message": "Order ID is required",
+                    "errors": {"order_id": ["This field is required."]}
                 }, status=status.HTTP_400_BAD_REQUEST)
             
             order = Order.objects.get(id=order_id, user=request.user)
@@ -57,7 +58,9 @@ class InitiatePaymentView(APIView):
                     "code": status.HTTP_400_BAD_REQUEST,
                     "status": "failed",
                     "message": "Order already paid",
-                    "data": {"order_id": order.id}
+                    "data": {"order_id": order.id,
+                             "payment_status": order.payment_status
+                            }
                 }, status=status.HTTP_400_BAD_REQUEST)
             # use transaction atomic to ensure data integrity
             with transaction.atomic():
@@ -118,7 +121,10 @@ class SSLCommerzSuccessView(APIView):
                     "code": status.HTTP_200_OK,
                     "status": "success",
                     "message": "Payment successful",
-                    "data": {"order_id": result['order'].id
+                    "data": {"order_id": result['order'].id,
+                             "status": result['order'].payment_status,
+                             "payment_id": result['payment'].id,
+                             "transaction_id": result['payment'].transaction_id,
                              }
                 }, status=status.HTTP_200_OK)
             else:
@@ -146,7 +152,7 @@ class SSLCommerzFailView(APIView):
     def post(self, request):
         try:
             transaction_id = request.data.get('tran_id')
-            print("Fail callback received for transaction:", transaction_id)
+            # print("Fail callback received for transaction:", transaction_id)
             
             if not transaction_id:
                 return Response({
@@ -157,7 +163,7 @@ class SSLCommerzFailView(APIView):
                 }, status=status.HTTP_400_BAD_REQUEST)
             
             try:
-                payment = Payment.objects.get(transaction_id=transaction_id)
+                payment = Payment.objects.select_related('order').get(transaction_id=transaction_id)
                 payment.status = 'failed'
                 payment.gateway_response = request.data
                 payment.save()
@@ -170,6 +176,7 @@ class SSLCommerzFailView(APIView):
                     "status": "failed",
                     "message": "Payment failed",
                     "data": {
+                        "order_id": payment.order.id,
                         "transaction_id": transaction_id,
                         "status": "failed",
                         "payment_id": payment.id if payment else None
@@ -212,7 +219,7 @@ class SSLCommerzCancelView(APIView):
                 }, status=status.HTTP_400_BAD_REQUEST)
             
             try:
-                payment = Payment.objects.get(transaction_id=transaction_id)
+                payment = Payment.objects.select_related('order').get(transaction_id=transaction_id)
                 payment.status = 'cancelled'
                 payment.gateway_response = request.data
                 payment.save()
@@ -225,6 +232,7 @@ class SSLCommerzCancelView(APIView):
                     "status": "cancelled",
                     "message": "Payment cancelled by user",
                     "data": {
+                        "order_id": payment.order.id,
                         "transaction_id": transaction_id,
                         "status": "cancelled",
                         "payment_id": payment.id if payment else None

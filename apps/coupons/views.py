@@ -1,9 +1,12 @@
+from decimal import Decimal
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
 from django.utils import timezone
 from django.db import transaction
 import logging
+from rest_framework.permissions import IsAuthenticated
+# from . import serializers
 
 from .models import Coupon, CouponUsage
 from .serializers import (
@@ -11,11 +14,15 @@ from .serializers import (
     CouponSerializerView,
     CouponUsageSerializerView
     ,CouponDetailSerializer
+    ,CouponApplySerializer
 )
 from apps.activity_log.utils.functions import log_request
 from config.utils.pagination import CustomPageNumberPagination
 
 logger = logging.getLogger("myapp")
+from . services.coupon_service import CouponService
+from rest_framework.serializers import ValidationError
+
 
 
 
@@ -198,3 +205,85 @@ class CouponDetailView(APIView):
                 "errors": {"server_error": [str(e)]}
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
      
+     
+     
+
+class CouponApplyView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = CouponApplySerializer(data=request.data)
+
+        if not serializer.is_valid():
+            return Response(
+                {
+                    "code": status.HTTP_400_BAD_REQUEST,
+                    "status": "failed",
+                    "message": "Invalid coupon data.",
+                    "errors": serializer.errors,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        order = serializer.validated_data["order"]
+        code = serializer.validated_data["code"]
+
+        try:
+            discount, coupon = CouponService.apply_coupon(
+                user=request.user,
+                order=order,
+                code=code
+            )
+
+            log_request(
+                request,
+                "Coupon applied",
+                "info",
+                f"Coupon {coupon.code} applied successfully",
+                response_status_code=status.HTTP_200_OK
+            )
+
+            return Response(
+                {
+                    "code": status.HTTP_200_OK,
+                    "status": "success",
+                    "message": f"Coupon {coupon.code} applied successfully.",
+                    "data": {
+                        "code": coupon.code,
+                        "discount_amount": float(discount),
+                        "order_subtotal": float(order.subtotal),
+                    },
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        except ValidationError as exc:
+            return Response(
+                {
+                    "code": status.HTTP_400_BAD_REQUEST,
+                    "status": "failed",
+                    "message": str(exc.detail[0] if isinstance(exc.detail, list) else exc.detail),
+                    "errors": {
+                        "coupon": [str(exc.detail[0] if isinstance(exc.detail, list) else exc.detail)]
+                    }
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            logger.exception("Error applying coupon")
+            log_request(
+                request,
+                "Error applying coupon",
+                "error",
+                f"An error occurred while applying coupon {code}",
+                response_status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+            return Response(
+                {
+                    "code": status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    "status": "failed",
+                    "message": "An internal error occurred while applying the coupon.",
+                    "errors": {"server_error": [str(e)]},
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
