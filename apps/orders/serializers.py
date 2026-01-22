@@ -9,6 +9,7 @@ import uuid
 import phonenumbers
 from apps.coupons.models import Coupon, CouponUsage
 from django.utils import timezone
+from . import models
 
 
 # from utils.order_number_generate import generate_order_number
@@ -50,8 +51,18 @@ class ShippingAddressSerializer(serializers.Serializer):
 
 
     def create(self, validated_data):
+        # shipping_fee = Decimal("50.00")
+        city = validated_data.get("city", "")
+        try:
+            if city.lower() == "dhaka":
+                config = models.ShippingConfiguration.objects.get(location_name__icontains="Inside Dhaka")
+            else:
+                config = models.ShippingConfiguration.objects.get(location_name__icontains="Outside Dhaka")
+        except models.ShippingConfiguration.DoesNotExist:
+            config = None
+
         user = validated_data.pop("user")
-        return ShippingAddress.objects.create(user=user, **validated_data)
+        return ShippingAddress.objects.create(user=user,shipping_configuration=config, **validated_data)
 
     
 
@@ -222,7 +233,7 @@ class OrderSerializer(serializers.Serializer):
             discount=discount,
             total_amount=total_amount,
             payment_method=payment_method,
-            payment_status='paid' if payment_method == 'online_payment' else 'unpaid',
+            payment_status='unpaid',
             shipping_address=validated_data["shipping_address"],
             customer_note=validated_data.get("customer_note", ""),
             coupon=applied_coupon
@@ -304,3 +315,7 @@ class OrderDetailSerializerView(serializers.ModelSerializer):
         # depth = 1
         
 
+class ShippingConfigurationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = models.ShippingConfiguration
+        fields = '__all__'

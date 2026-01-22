@@ -28,5 +28,6 @@ urlpatterns = [
     path('v1/payments/refunds/list/', views.RefundListView.as_view(), name='refund-list'),
     
     path('v1/payments/platform_holds/', views.PlatformHoldListView.as_view(), name='platform_hold_list'),
+    path('v1/payments/<int:payment_id>/', views.PaymentDetailView.as_view(), name='payment_detail'),
 ]
 

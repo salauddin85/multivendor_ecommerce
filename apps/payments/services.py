@@ -7,17 +7,20 @@ from decimal import Decimal
 import uuid
 import hashlib
 from sslcommerz_lib import SSLCOMMERZ
+from urllib3 import request
 from .models import (
     Payment, PlatformHold, Payout, Wallet, 
     WalletTransaction, WithdrawalRequest, RefundRequest
 )
 from apps.orders.models import Order, OrderItem
 from apps.stores.models import Store, CommissionRate
+from .utils.helper_functions import extract_gateway_response
 
 
 # ==========================================
 # SSLCOMMERZ PAYMENT SERVICE
 # ==========================================
+
 
 class SSLCommerzService:
     """Handle SSLCommerz payment gateway integration"""
@@ -101,7 +104,11 @@ class SSLCommerzService:
         response = self.sslcz.createSession(post_data)
         
         if response.get('status') == 'SUCCESS':
-            payment.gateway_response = response
+            payment.gateway_response = {
+                "sessionkey": response.get("sessionkey"),
+                "gateway_page_url": response.get("GatewayPageURL"),
+                "initiated_at": timezone.now().isoformat()
+            }
             payment.save()
             
             return {
@@ -112,7 +119,12 @@ class SSLCommerzService:
             }
         else:
             payment.status = 'failed'
-            payment.gateway_response = response
+            payment.gateway_response = {
+                "status": request.data.get("status"),
+                "tran_id": request.data.get("tran_id"),
+                "reason": request.data.get("failedreason", "User cancelled")
+            }
+
             payment.save()
             
             return {
@@ -151,7 +163,7 @@ class SSLCommerzService:
                     payment.val_id = val_id
                     payment.card_type = card_type
                     payment.card_brand = card_brand
-                    payment.gateway_response = data
+                    payment.gateway_response = extract_gateway_response(data)
                     payment.paid_at = timezone.now()
                     payment.save()
                     
@@ -159,7 +171,7 @@ class SSLCommerzService:
                     order = payment.order
                     order.payment_status = 'paid'
                     order.status = 'confirmed'
-                    order.payment_method = f'sslcommerz_{card_type}'
+                    order.payment_type = f'sslcommerz_{card_type}'
                     order.save()
                     
                     # Create platform holds

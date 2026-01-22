@@ -7,7 +7,7 @@ from .models import (
     WithdrawalRequest, RefundRequest, PlatformHold
 )
 from .services import WithdrawalService
-from apps.orders.models import OrderItem
+from apps.orders.models import Order, OrderItem
 
 
 class PaymentSerializer(serializers.ModelSerializer):
@@ -20,7 +20,7 @@ class PaymentSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'transaction_id', 'method', 'amount', 
             'currency', 'status', 'paid_at', 'created_at',
-             'gateway_response'
+             
         ]
 
 
@@ -223,7 +223,23 @@ class PlatformHoldSerializer(serializers.ModelSerializer):
             'hold_until', 'released_at', 'created_at'
         ]
 
+class OrderShortSerializer(serializers.ModelSerializer):
+    """Short order info for embedding in payment details"""
+    
+    class Meta:
+        model = Order
+        fields = "__all__"
 
+class PaymentDetailSerializer(serializers.ModelSerializer):
+    """Detailed payment info including related order items"""
+    
+    order = OrderShortSerializer(read_only=True)
+    
+    class Meta:
+        model = Payment
+        fields = "__all__"
+    
+    
 
 
 

@@ -893,7 +893,7 @@ class AttributeSpecificValuesListView(APIView):
 
 
 class ProductVariantView(APIView):
-    # permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated,IsAdminUser]
 
     def get(self, request):
         try:

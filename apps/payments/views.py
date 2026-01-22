@@ -28,6 +28,7 @@ from config.utils.pagination import CustomPageNumberPagination
 
 
 from apps.orders.serializers import OrderSerializerView
+from . import serializers
 
 # ==========================================
 # PAYMENT INITIATION
@@ -117,7 +118,8 @@ class SSLCommerzSuccessView(APIView):
                     "code": status.HTTP_200_OK,
                     "status": "success",
                     "message": "Payment successful",
-                    "data": {"order_id": result['order'].id}
+                    "data": {"order_id": result['order'].id
+                             }
                 }, status=status.HTTP_200_OK)
             else:
                 return Response({
@@ -670,10 +672,13 @@ class PaymentListView(APIView):
     
     def get(self, request):
         try:
-            payments = Payment.objects.all().order_by('-created_at')
-            serializer = serializers.PaymentSerializer(payments, many=True)
+            payments = Payment.objects.select_related('order').all().order_by('-created_at')
+            # pagination
+            pagination = CustomPageNumberPagination()
+            result_page = pagination.paginate_queryset(payments, request, view=self)
+            serializer = serializers.PaymentSerializer(result_page, many=True)
             
-            return Response({
+            return pagination.get_paginated_response({
                 "code": status.HTTP_200_OK,
                 "status": "success",
                 "message": "Payments retrieved successfully",
@@ -739,5 +744,38 @@ class PayoutListView(APIView):
                 "code": status.HTTP_500_INTERNAL_SERVER_ERROR,
                 "status": "failed",
                 "message": "Failed to retrieve payouts",
+                "errors": {"server_error": [str(e)]}
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+            
+
+class PaymentDetailView(APIView):
+    """Retrieve payment details by ID"""
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request, payment_id):
+        try:
+            payment = Payment.objects.get(id=payment_id)
+            serializer = serializers.PaymentDetailSerializer(payment)
+            
+            return Response({
+                "code": status.HTTP_200_OK,
+                "status": "success",
+                "message": "Payment details retrieved successfully",
+                "data": serializer.data
+            }, status=status.HTTP_200_OK)
+        except Payment.DoesNotExist:
+            return Response({
+                "code": status.HTTP_404_NOT_FOUND,
+                "status": "failed",
+                "message": "Payment not found",
+                "data": {"payment_id": payment_id}
+            }, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            logger.exception(str(e))
+            return Response({
+                "code": status.HTTP_500_INTERNAL_SERVER_ERROR,
+                "status": "failed",
+                "message": "Failed to retrieve payment details",
                 "errors": {"server_error": [str(e)]}
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
