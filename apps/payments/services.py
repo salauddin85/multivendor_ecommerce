@@ -41,7 +41,7 @@ class SSLCommerzService:
         # STEP-1: check existing pending/processing payment
         existing_payment = Payment.objects.filter(
             order=order,
-            status__in=['pending', 'processing']
+            status__in=['pending', 'processing','failed','cancelled']
         ).first()
         if existing_payment:
             return {

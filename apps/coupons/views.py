@@ -252,6 +252,7 @@ class CouponApplyView(APIView):
                         "code": coupon.code,
                         "discount_amount": float(discount),
                         "order_subtotal": float(order.subtotal),
+                        "order_total_amount": float(order.total_amount)
                     },
                 },
                 status=status.HTTP_200_OK,

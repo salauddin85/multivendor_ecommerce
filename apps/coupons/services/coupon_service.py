@@ -64,6 +64,7 @@ class CouponService:
         # Update order totals safely
         order.coupon = coupon
         order.subtotal = order.subtotal - discount
-        order.save(update_fields=["coupon", "subtotal"])
+        order.total_amount = order.total_amount - discount
+        order.save(update_fields=["coupon", "subtotal", "total_amount"])
 
         return discount, coupon
