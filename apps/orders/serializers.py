@@ -12,6 +12,7 @@ from django.utils import timezone
 from . import models
 from django.db.models import F
 from rest_framework.exceptions import ValidationError
+from .utils.get_shipping_configuration import get_shipping_configuration
 
 
 
@@ -118,178 +119,6 @@ class OrderItemInputSerializer(serializers.Serializer):
 
         return data
 
-
-# class OrderSerializer(serializers.Serializer):
-#     shipping_address = serializers.PrimaryKeyRelatedField(
-#         queryset=ShippingAddress.objects.all()
-#     )
-#     customer_note = serializers.CharField(required=False, allow_blank=True)
-#     items = OrderItemInputSerializer(many=True)
-#     coupon_code = serializers.CharField(required=False, allow_blank=True)
-#     payment_method = serializers.CharField(required=False, default='cash_on_delivery')
-
-#     # =========================
-#     # ADDRESS OWNERSHIP CHECK
-#     # =========================
-#     def validate_shipping_address(self, value):
-#         request = self.context["request"]
-#         if value.user != request.user:
-#             raise serializers.ValidationError(
-#                 "This shipping address does not belong to you."
-#             )
-#         return value
-
-#     # =========================
-#     # CREATE ORDER
-#     # =========================
-#     @transaction.atomic
-#     def create(self, validated_data):
-#         request = self.context["request"]
-
-#         items_data = validated_data.pop("items")
-#         coupon_code = validated_data.pop("coupon_code", "").strip()
-#         payment_method = validated_data.pop('payment_method', 'cash_on_delivery')
-#         address = validated_data["shipping_address"]
-#         subtotal = Decimal("0.00")
-
-#         # =========================
-#         # SUBTOTAL CALCULATION
-#         # =========================
-#         for item in items_data:
-#             product = item["product"]
-#             variant = item.get("variant")
-#             qty = item["quantity"]
-
-#             if variant:
-#                 price = variant.discount_price or variant.price
-#             else:
-#                 price = product.base_price
-
-#             subtotal += price * qty
-#         # =========================
-#         # SHIPPING, TAX, DISCOUNT
-#         # shipping_fee = Decimal("50.00")
-#         try:
-#             if address.city.lower() == "dhaka":
-#                 config = models.ShippingConfiguration.objects.get(location_name__icontains="Inside Dhaka")
-#             else:
-#                 config = models.ShippingConfiguration.objects.get(location_name__icontains="Outside Dhaka")
-#             shipping_fee = config.shipping_fee
-#         except models.ShippingConfiguration.DoesNotExist:
-#             shipping_fee = Decimal("0.00")
-#         # =========================
-#         tax = Decimal("0.00")
-#         discount = Decimal("0.00")
-#         applied_coupon = None
-
-#         # =========================
-#         # COUPON VALIDATION
-#         # =========================
-#         if coupon_code:
-#             now = timezone.now()
-
-#             coupon = Coupon.objects.select_for_update().filter(
-#                 code=coupon_code,
-#                 status="active",
-#                 valid_from__lte=now,
-#                 valid_to__gte=now
-#             ).first()
-
-#             if not coupon:
-#                 raise serializers.ValidationError({
-#                     "coupon_code": "Invalid or expired coupon."
-#                 })
-
-#             if subtotal < coupon.min_order_amount:
-#                 raise serializers.ValidationError({
-#                     "coupon_code": "Order amount too low for this coupon."
-#                 })
-
-#             if coupon.usage_limit and coupon.usage_count >= coupon.usage_limit:
-#                 raise serializers.ValidationError({
-#                     "coupon_code": "Coupon usage limit exceeded."
-#                 })
-
-#             if coupon.type == "percentage":
-#                 discount = (subtotal * coupon.value) / Decimal("100")
-#             else:
-#                 discount = coupon.value
-
-#             applied_coupon = coupon
-
-#         total_amount = subtotal + shipping_fee + tax - discount
-
-#         # =========================
-#         # CREATE ORDER
-#         # =========================
-#         order = Order.objects.create(
-#             order_number=f"ORD-{uuid.uuid4().hex[:10].upper()}",
-#             user=request.user,
-#             subtotal=subtotal,
-#             shipping_fee=shipping_fee,
-#             tax=tax,
-#             discount=discount,
-#             total_amount=total_amount,
-#             payment_method=payment_method,
-#             payment_status='unpaid',
-#             shipping_address=validated_data["shipping_address"],
-#             customer_note=validated_data.get("customer_note", ""),
-#             coupon=applied_coupon
-#         )
-
-#         # =========================
-#         # CREATE ORDER ITEMS
-#         # =========================
-#         for item in items_data:
-#             product = item["product"]
-#             variant = item.get("variant")
-#             qty = item["quantity"]
-
-#             if variant:
-#                 price = variant.discount_price or variant.price
-#                 variant_name = variant.variant_name
-#             else:
-#                 price = product.base_price
-#                 variant_name = ""
-
-#             OrderItem.objects.create(
-#                 order=order,
-#                 product=product,
-#                 variant=variant,
-#                 store=product.store,
-#                 product_name=product.title,
-#                 variant_name=variant_name,
-#                 quantity=qty,
-#                 price=price,
-#                 subtotal=price * qty
-#             )
-
-#             # =========================
-#             # STOCK UPDATE (CRITICAL)
-#             # =========================
-#             if variant:
-#                 variant.stock -= qty
-#                 variant.save(update_fields=["stock"])
-#             else:
-#                 product.stock -= qty
-#                 product.save(update_fields=["stock"])
-
-#         # =========================
-#         # COUPON USAGE TRACKING
-#         # =========================
-#         if applied_coupon:
-#             CouponUsage.objects.create(
-#                 coupon=applied_coupon,
-#                 user=request.user,
-#                 order=order,
-#                 store=order.items.first().store,
-#                 discount_amount=discount
-#             )
-
-#             applied_coupon.usage_count += 1
-#             applied_coupon.save(update_fields=["usage_count"])
-
-#         return order
 
 
 class OrderSerializer(serializers.Serializer):
@@ -449,12 +278,12 @@ class OrderConfirmationSerializer(serializers.Serializer):
     
 
 class AddExistingAddressSerializer(serializers.Serializer):
-    address = serializers.PrimaryKeyRelatedField(
+    shipping_address = serializers.PrimaryKeyRelatedField(
         queryset=ShippingAddress.objects.all()
     )
     is_default = serializers.BooleanField(required=False, default=False)
 
-    def validate_address(self, value):
+    def validate_shipping_address(self, value):
         request = self.context["request"]
         if value.user != request.user:
             raise serializers.ValidationError(
@@ -463,9 +292,20 @@ class AddExistingAddressSerializer(serializers.Serializer):
         return value
     
     def update(self, instance, validated_data):
-        instance.shipping_address = validated_data.get("address", instance.shipping_address)
+        instance.shipping_address = validated_data.get("shipping_address", instance.shipping_address)
+        shipping_address = validated_data.get("shipping_address")
+        # import pdb; pdb.set_trace()
+        city = shipping_address.city
+
+        shipping_config = get_shipping_configuration(city)
+        shipping_fee = (
+            shipping_config.shipping_fee if shipping_config else Decimal("0.00")
+        )
+        
         instance.shipping_address.is_default = validated_data.get("is_default", instance.shipping_address.is_default)
         instance.shipping_address.save(update_fields=["is_default"])
-        instance.save(update_fields=["shipping_address"])
+        instance.shipping_fee = shipping_fee
+        instance.total_amount = instance.subtotal + shipping_fee
+        instance.save(update_fields=["shipping_address", "shipping_fee", "total_amount"])
         
         return instance

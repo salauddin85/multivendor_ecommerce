@@ -13,6 +13,7 @@ class ShippingAddressService:
     """
 
     @staticmethod
+    
     def get_shipping_configuration(city: str):
         location_keyword = (
             "Inside Dhaka" if city.strip().lower() == "dhaka" else "Outside Dhaka"
