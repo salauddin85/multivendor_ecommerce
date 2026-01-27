@@ -958,7 +958,7 @@ class ProductVariantDetailView(APIView):
     def get(self, request, pk):
         try:
             variant = models.ProductVariant.objects.select_related('product').get(pk=pk)
-            serializer = serializers.ProductVariantSerializerView(variant)
+            serializer = serializers.ProductVariantDetailSerializerView(variant)
             log_request(request, f"Product variant {pk} fetched", "info", "Product variant fetched successfully", response_status_code=status.HTTP_200_OK)
             return Response({
                 "code": status.HTTP_200_OK,

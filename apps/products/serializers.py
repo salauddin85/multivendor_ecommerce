@@ -177,7 +177,14 @@ class ProductAttributeSerializer(serializers.Serializer):
         value = re.sub(r'[^\w\s]', '', value)     
         value = re.sub(r'\s+', '_', value)       
         value = value.lower()
-        return value.strip('_')
+        value = value.strip('_')
+        
+        if self.instance:
+            if self.instance.name == value:
+                return value
+        if models.ProductAttribute.objects.filter(name=value).exists():
+            raise serializers.ValidationError('Attribute already exists. Attribute name must be unique.')
+        return value
     
     def create(self, validated_data):
         product_attribute = models.ProductAttribute.objects.create(**validated_data)
@@ -196,12 +203,18 @@ class ProductAttributeSerializerForView(serializers.ModelSerializer):
         model = models.ProductAttribute
         fields = '__all__'
 
+class ProductSimpleSerializerForAttributeView(serializers.ModelSerializer):
+    class Meta:
+        model = models.Product
+        fields = ['id', 'title', 'slug']
+
 
 class ProductAttributeSerializerDetailView(serializers.ModelSerializer):
+    product = ProductSimpleSerializerForAttributeView()
     class Meta:
         model = models.ProductAttribute
         fields = '__all__'
-        depth = 1
+        # depth = 1
 
 class ProductAttributeValueSerializer(serializers.Serializer):
     id = serializers.IntegerField(read_only=True, required=False)
@@ -334,6 +347,19 @@ class ProductVariantSerializer(serializers.Serializer):
 
 class ProductVariantSerializerView(serializers.ModelSerializer):
     product = serializers.StringRelatedField()
+
+    class Meta:
+        model = models.ProductVariant
+        fields = '__all__'
+
+
+class ProductSimpleSerializerForVariantView(serializers.ModelSerializer):
+    class Meta:
+        model = models.Product
+        fields = ['id', 'title', 'slug']
+        
+class ProductVariantDetailSerializerView(serializers.ModelSerializer):
+    product = ProductSimpleSerializerForVariantView()
 
     class Meta:
         model = models.ProductVariant
