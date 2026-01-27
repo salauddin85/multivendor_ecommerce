@@ -6,6 +6,8 @@ from apps.stores.models import Store
 from apps.products.models import Product, ProductVariant
 from .constants.choices import STATUS_CHOICES, PAYMENT_STATUS_CHOICES,ORDER_TYPE_CHOICES
 from apps.coupons.models import Coupon
+from django.db import transaction
+from django.db.models import Q
 
 
 
@@ -41,6 +43,23 @@ class ShippingAddress(OrderBaseModel):
     type = models.CharField(max_length=20, choices=ORDER_TYPE_CHOICES)
     is_default = models.BooleanField(default=False)
     
+    def save(self, *args, **kwargs):
+        with transaction.atomic():
+            if self.is_default and self.user:
+                ShippingAddress.objects.select_for_update().filter(
+                    user=self.user,
+                    is_default=True
+                ).exclude(pk=self.pk).update(is_default=False)
+
+            super().save(*args, **kwargs)
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user'],
+                condition=Q(is_default=True),
+                name='unique_default_shipping_address_per_user'
+            )
+        ]
     def __str__(self):
         return self.name
     

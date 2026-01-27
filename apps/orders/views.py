@@ -598,3 +598,63 @@ class OrderConfirmationView(APIView):
                 "message": "An error occurred while confirming order.",
                 "errors": {"server_error": [str(e)]},
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+
+
+class AddExistingAddressToOrderView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        try:
+            order = models.Order.objects.get(pk=pk, user=request.user)
+            serializer = serializers.AddExistingAddressSerializer(data=request.data, context={"request": request}, instance=order,partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                address = serializer.validated_data.get('shipping_address') 
+                log_request(request, "Existing address added to order", "info",
+                            "Existing address added to order successfully", response_status_code=status.HTTP_200_OK)
+                return Response(
+                    {
+                        "code": status.HTTP_200_OK,
+                        "status": "success",
+                        "message": "Existing address added to order successfully.",
+                        "data": {
+                            "order_id": order.id,
+                            "order_number": order.order_number,
+                        },
+                    },
+                    status=status.HTTP_200_OK,
+                )
+            else:
+                return Response(
+                    {
+                        "code": status.HTTP_400_BAD_REQUEST,
+                        "status": "failed",
+                        "message": "Invalid data",
+                        "errors": serializer.errors
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+        except models.Order.DoesNotExist:
+            return Response(
+                {
+                    "code": status.HTTP_404_NOT_FOUND,
+                    "status": "failed",
+                    "message": "Order not found.",
+                    "errors":{
+                        "order_id": [f"Order not found with id {pk}"]
+                    }
+                },
+                status=status.HTTP_404_NOT_FOUND,
+            )
+                    
+        except Exception as e:
+            logger.exception(str(e))
+            log_request(request, "Error adding existing address to order", "error",
+                        "An error occurred while adding existing address to order", response_status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({
+                "code": status.HTTP_500_INTERNAL_SERVER_ERROR,
+                "status": "failed",
+                "message": "An error occurred while adding existing address to order.",
+                "errors": {"server_error": [str(e)]},
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

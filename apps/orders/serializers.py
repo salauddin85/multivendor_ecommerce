@@ -446,3 +446,26 @@ class OrderConfirmationSerializer(serializers.Serializer):
         instance.status = 'confirmed'
         instance.save(update_fields=['payment_method', 'customer_note', 'status'])
         return instance
+    
+
+class AddExistingAddressSerializer(serializers.Serializer):
+    address = serializers.PrimaryKeyRelatedField(
+        queryset=ShippingAddress.objects.all()
+    )
+    is_default = serializers.BooleanField(required=False, default=False)
+
+    def validate_address(self, value):
+        request = self.context["request"]
+        if value.user != request.user:
+            raise serializers.ValidationError(
+                "This shipping address does not belong to you."
+            )
+        return value
+    
+    def update(self, instance, validated_data):
+        instance.shipping_address = validated_data.get("address", instance.shipping_address)
+        instance.shipping_address.is_default = validated_data.get("is_default", instance.shipping_address.is_default)
+        instance.shipping_address.save(update_fields=["is_default"])
+        instance.save(update_fields=["shipping_address"])
+        
+        return instance
