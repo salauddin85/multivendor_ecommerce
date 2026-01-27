@@ -433,7 +433,7 @@ class OrderListView(APIView):
 
     def get(self, request):
         try:
-            orders = models.Order.objects.select_related('user','shipping_address','parent').filter(user=request.user)
+            orders = models.Order.objects.select_related('user','shipping_address','parent').filter(user=request.user).order_by("-id")
             paginator = CustomPageNumberPagination()
             result_page = paginator.paginate_queryset(orders, request)
             serializer = serializers.OrderSerializerView(result_page, many=True)
