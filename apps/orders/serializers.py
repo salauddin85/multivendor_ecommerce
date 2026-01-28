@@ -1,7 +1,7 @@
 
 from rest_framework import serializers
 from . import models
-from apps.products.models import Product, ProductVariant
+from apps.products.models import Product, ProductVariant, ProductImage
 from apps.orders.models import Order, OrderItem, ShippingAddress
 from django.db import transaction
 from decimal import Decimal
@@ -235,15 +235,40 @@ class OrderSerializerView(serializers.ModelSerializer):
     class Meta:
         model = models.Order
         fields = '__all__'
+        
+class ProductImageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProductImage
+        fields = ['id', 'image']
+        
+class ProductSerializerForOrder(serializers.ModelSerializer):
+    images = ProductImageSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Product
+        fields = [
+            'id',
+            'title',
+            'slug',
+            'base_price',
+            'main_image',
+            'images'
+        ]
+
+
 
 class OrderItemSerializerView(serializers.ModelSerializer):
+    product = ProductSerializerForOrder(read_only=True)
+
     class Meta:
         model = models.OrderItem
         fields = '__all__'
         
+        
+        
 
 class OrderDetailSerializerView(serializers.ModelSerializer):
-    items = OrderItemSerializerView(many=True)
+    items = OrderItemSerializerView(many=True,read_only=True)
     # shipping_address = ShippingAddressSerializerForView()
     
     class Meta:
