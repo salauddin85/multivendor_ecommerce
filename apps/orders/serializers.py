@@ -236,13 +236,12 @@ class OrderSerializerView(serializers.ModelSerializer):
         model = models.Order
         fields = '__all__'
         
-class ProductImageSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = ProductImage
-        fields = ['id', 'image']
+# class ProductImageSerializer(serializers.ModelSerializer):
+#     class Meta:
+#         model = ProductImage
+#         fields = ['id', 'image']
         
 class ProductSerializerForOrder(serializers.ModelSerializer):
-    images = ProductImageSerializer(many=True, read_only=True)
 
     class Meta:
         model = Product
@@ -252,7 +251,6 @@ class ProductSerializerForOrder(serializers.ModelSerializer):
             'slug',
             'base_price',
             'main_image',
-            'images'
         ]
 
 
