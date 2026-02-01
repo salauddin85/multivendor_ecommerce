@@ -12,6 +12,8 @@ from rest_framework.permissions import IsAuthenticated,IsAdminUser,AllowAny
 from config.utils.pagination import CustomPageNumberPagination
 from .filters import ProductFilter
 from django.db.models import Q
+from django.db.models import Sum
+from apps.orders.models import OrderItem
 
 
 
@@ -62,57 +64,6 @@ class ProductsView(APIView):
                 }
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    # def get(self, request):
-    #     try:
-    #         queryset = models.Product.objects.select_related('store', 'category', 'brand').filter(status='draft')
-            
-    #         brand_slug = request.GET.get("brand")
-    #         category_slug = request.GET.get("category")
-    #         search = request.GET.get("search")
-            
-            
-    #         filters = Q()
-    #         if brand_slug:
-    #             filters &= Q(brand__slug=brand_slug)
-
-    #         if category_slug:
-    #             filters &= Q(category__slug=category_slug)
-
-    #         if search:
-    #             filters &= Q(title__icontains=search)
-    #         if brand_slug or category_slug or search:
-    #             queryset = queryset.filter(filters)
-
-            
-    #         filter_set = ProductFilter(request.GET, queryset=queryset)
-    #         products = filter_set.qs
-    #         paginator = CustomPageNumberPagination()
-    #         products = paginator.paginate_queryset(products, request, view=self)
-    #         fields = request.GET.get('fields')
-    #         if fields:
-    #             fields = fields.split(',')
-    #             serializer = serializers.ProductSerializerView(products, many=True, fields=fields)
-    #         else:
-    #             serializer = serializers.ProductSerializerView(products, many=True)
-
-    #         log_request(request, "Products fetched", "info", "Products fetched successfully", response_status_code=status.HTTP_200_OK)
-    #         return paginator.get_paginated_response({
-    #             "code": status.HTTP_200_OK,
-    #             "status": "success",
-    #             "message": "Products fetched successfully",
-    #             "data": serializer.data
-    #         }, status=status.HTTP_200_OK)
-    #     except Exception as e:
-    #         logger.exception(str(e))
-    #         log_request(request, "Product fetch failed", "error", "Product fetch failed due to server error", response_status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
-    #         return Response({
-    #             "code": status.HTTP_500_INTERNAL_SERVER_ERROR,
-    #             "status": "error",
-    #             "message": "Product fetch failed due to server error",
-    #             "errors": {
-    #                 'server_error': [str(e)]
-    #             }
-    #         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
     def get(self, request):
         try:
@@ -1368,5 +1319,118 @@ class SingleProductAnalyticsView(APIView):
                 "code": status.HTTP_500_INTERNAL_SERVER_ERROR,
                 "status": "failed",
                 "message": "Internal server error",
+                "errors": {"server_error": [str(e)]}
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+            
+
+class LatestProductsView(APIView):
+    """
+    Get latest 15 products with pagination
+    """
+    def get(self, request):
+        try:
+            # Filter only published products
+            queryset = models.Product.objects.select_related('brand','category','store').filter(
+                status="published"
+            ).order_by("-created_at")[:15]
+            
+            # Apply pagination
+            paginator = CustomPageNumberPagination()            
+            # Paginate the queryset            
+            serializer = serializers.ProductSerializerView(queryset, many=True)
+            
+            return paginator.get_paginated_response({
+                "code": status.HTTP_200_OK,
+                "status": "success",
+                "message": "Latest products fetched successfully",
+                "data": serializer.data
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            logger.exception(str(e))
+            return Response({
+                "code": status.HTTP_500_INTERNAL_SERVER_ERROR,
+                "status": "error",
+                "message": "Failed to fetch latest products",
+                "errors": {"server_error": [str(e)]}
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+class BestSellingProductsView(APIView):
+    """
+    Get 15 best selling products based on actual order data
+    """
+    def get(self, request):
+        try:
+            
+            # Aggregate total quantity sold for each product
+            product_sales = OrderItem.objects.filter(
+                order__payment_status='paid',  # Only paid orders
+                order__status__in=['confirmed', 'completed', 'delivered'] 
+            ).values('product_id').annotate(
+                total_quantity_sold=Sum('quantity')
+            ).order_by('-total_quantity_sold')
+            
+            # Get product IDs with sales data
+            product_ids = [item['product_id'] for item in product_sales if item['product_id']]
+            
+            # Get product objects
+            products_by_sales = models.Product.objects.filter(
+                id__in=product_ids,
+                status="published"
+            ).in_bulk(product_ids)
+            
+            # Create ordered list based on sales
+            ordered_products = []
+            for pid in product_ids:
+                if pid in products_by_sales:
+                    ordered_products.append(products_by_sales[pid])
+            
+            # If there are not enough products with sales data,
+            # add more published products
+            if len(ordered_products) < 15:
+                additional_products = models.Product.objects.filter(
+                    status="published"
+                ).exclude(
+                    id__in=product_ids
+                ).order_by("-created_at")[:15 - len(ordered_products)]
+                ordered_products.extend(list(additional_products))
+            
+            # Apply pagination with page size 15
+            paginator = CustomPageNumberPagination()
+            paginator.page_size = 15
+            
+            # Paginate the ordered_products list
+            paginated_products = paginator.paginate_queryset(ordered_products, request, view=self)
+            
+            # Create a custom serializer response with sales data
+            product_list = []
+            for product in paginated_products:
+                # Find sales count for this product
+                sales_data = next(
+                    (item for item in product_sales if item['product_id'] == product.id), 
+                    {'total_quantity_sold': 0}
+                )
+                
+                # Get basic product data
+                product_data = serializers.ProductSerializerView(product).data
+                # Add sales count
+                product_data['total_sales'] = sales_data['total_quantity_sold']
+                product_list.append(product_data)
+            
+            # Return paginated response
+            return paginator.get_paginated_response({
+                "code": status.HTTP_200_OK,
+                "status": "success",
+                "message": "Best selling products fetched successfully",
+                "data": product_list
+            })
+            
+        except Exception as e:
+            logger.exception(str(e))
+            return Response({
+                "code": status.HTTP_500_INTERNAL_SERVER_ERROR,
+                "status": "error",
+                "message": "Failed to fetch best selling products",
                 "errors": {"server_error": [str(e)]}
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

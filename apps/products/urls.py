@@ -2,6 +2,8 @@ from django.urls import path
 from . import views
 urlpatterns = [
     path('v1/products/', views.ProductsView.as_view(), name="products_view"),
+    path('v1/products/latest/',views.LatestProductsView.as_view(),name = "latest_products_view"),
+    path('v1/products/best_selling/',views.BestSellingProductsView.as_view(),name = "best_selling_products_view"),
     
     # specific paths BEFORE the slug pattern
     path('v1/products/attributes/', views.ProductAttributeView.as_view(), name="product_attribute_view"),
