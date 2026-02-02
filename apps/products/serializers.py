@@ -133,7 +133,7 @@ class ProductSerializerView(DynamicFieldsModelSerializer):
     
     class Meta:
         model = models.Product
-        fields = ['id','slug', 'store', 'category', 'brand', 'title', 'type', 'description', 'base_price', 'main_image', 'stock', 'is_featured', 'status']
+        fields = ['id','slug', 'store', 'category', 'brand', 'title', 'type', 'base_price', 'main_image', 'stock', 'is_featured', 'status']
 
 
 class ProductStoreForProductDetailsSerializer(serializers.ModelSerializer):

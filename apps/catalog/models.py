@@ -31,7 +31,12 @@ class Category(CatalogBaseModel):
                 counter += 1
             self.slug = slug
         super().save(*args, **kwargs)
-
+        
+    class Meta:
+        indexes = [
+            models.Index(fields=['is_active', 'display_order']),
+        ]
+        
     def __str__(self):
         return self.name
     

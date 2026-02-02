@@ -11,9 +11,13 @@ from django.db import transaction
 from rest_framework.permissions import IsAuthenticated,IsAdminUser,AllowAny
 from config.utils.pagination import CustomPageNumberPagination
 from .filters import ProductFilter
-from django.db.models import Q
-from django.db.models import Sum
+from django.db.models import Prefetch, Count, Subquery, OuterRef,Q,Sum
+
 from apps.orders.models import OrderItem
+from apps.catalog.models import Category
+from decimal import Decimal
+
+
 
 
 
@@ -64,75 +68,52 @@ class ProductsView(APIView):
                 }
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    
     def get(self, request):
         try:
             queryset = (
                 models.Product.objects
                 .select_related("store", "category", "brand")
-                .filter(status = "published").order_by("-id")
-                # .filter(Q(status="draft") | Q(status="published"))
+                .filter(status="published")
             )
-
-            # --------------------
-            # Query Params
-            # --------------------
-            brand = request.GET.get("brand")
-            category = request.GET.get("category")
-            search = request.GET.get("search")
-            title = request.GET.get("title")
-            store = request.GET.get("store")
-            min_price = request.GET.get("min_price")
-            max_price = request.GET.get("max_price")
 
             filters = Q()
 
-            # --------------------
-            # Slug based filters
-            # --------------------
+            brand = request.GET.get("brand")
+            category = request.GET.get("category")
+            search = request.GET.get("search")
+            store = request.GET.get("store")
+            min_price = request.GET.get("min_price")
+            max_price = request.GET.get("max_price")
+            new_arrival = request.GET.get("new_arrival")
+
             if brand:
                 filters &= Q(brand__slug=brand)
 
             if category:
                 filters &= Q(category__slug=category)
 
-            # --------------------
-            # Text search
-            # --------------------
             if search:
                 filters &= Q(title__icontains=search)
-
-            if title:
-                filters &= Q(title__icontains=title)
 
             if store:
                 filters &= Q(store__store_name__icontains=store)
 
-            # --------------------
-            # Price range
-            # --------------------
             if min_price:
-                filters &= Q(base_price__gte=min_price)
-
+                filters &= Q(base_price__gte=Decimal(min_price))
             if max_price:
-                filters &= Q(base_price__lte=max_price)
+                filters &= Q(base_price__lte=Decimal(max_price))
 
-            if filters:
-                queryset = queryset.filter(filters)
+            queryset = queryset.filter(filters)
 
-            # --------------------
-            # Pagination & Serialize
-            # --------------------
+            if new_arrival=="true":
+                queryset = queryset.order_by("-created_at")
+            else:
+                queryset = queryset.order_by("id")
+
             paginator = CustomPageNumberPagination()
             products = paginator.paginate_queryset(queryset, request, view=self)
 
-            fields = request.GET.get("fields")
-            if fields:
-                serializer = serializers.ProductSerializerView(
-                    products, many=True, fields=fields.split(",")
-                )
-            else:
-                serializer = serializers.ProductSerializerView(products, many=True)
+            serializer = serializers.ProductSerializerView(products, many=True)
 
             return paginator.get_paginated_response({
                 "code": 200,
@@ -147,8 +128,13 @@ class ProductsView(APIView):
                 "code": 500,
                 "status": "error",
                 "message": "Product fetch failed",
-                "errors": {"server_error": [str(e)]}
+                "errors": {
+                    "server_error": [str(e)]
+                }
             }, status=500)
+
+
+
 class ProductsDetailView(APIView):
     # permission_classes = [IsAuthenticated]
 
@@ -1334,13 +1320,10 @@ class LatestProductsView(APIView):
             queryset = models.Product.objects.select_related('brand','category','store').filter(
                 status="published"
             ).order_by("-created_at")[:15]
-            
-            # Apply pagination
-            paginator = CustomPageNumberPagination()            
-            # Paginate the queryset            
+                
             serializer = serializers.ProductSerializerView(queryset, many=True)
             
-            return paginator.get_paginated_response({
+            return Response({
                 "code": status.HTTP_200_OK,
                 "status": "success",
                 "message": "Latest products fetched successfully",
@@ -1432,5 +1415,151 @@ class BestSellingProductsView(APIView):
                 "code": status.HTTP_500_INTERNAL_SERVER_ERROR,
                 "status": "error",
                 "message": "Failed to fetch best selling products",
+                "errors": {"server_error": [str(e)]}
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+            
+
+# class TopFiveCategoriesProductView(APIView):
+#     """
+#     Get paginated categories with their products
+#     """
+#     def get(self, request):
+#         try:
+#             # Get all categories ordered by display_order
+#             categories = Category.objects.filter(
+#                 is_active=True
+#             ).order_by('display_order')[:5].prefetch_related(
+#                 Prefetch(
+#                     'products',  
+#                     queryset=models.Product.objects.filter(
+#                         status="published"
+#                     ).order_by('-created_at')[:10],
+#                     to_attr='category_products'
+#                 )
+#             )
+            
+#             # Apply pagination (5 categories per page)
+            
+            
+#             response_data = []
+            
+#             for category in categories:
+#                 # Get 10 products for each category
+#                 category_products = models.Product.objects.filter(
+#                     category=category,
+#                     status="published"
+#                 ).order_by('-created_at')[:10]
+                
+#                 # Serialize products
+#                 product_serializer = serializers.ProductSerializerView(
+#                     category_products, 
+#                     many=True
+#                 )
+                
+#                 category_data = {
+#                     "category_id": category.id,
+#                     "category_name": category.name,
+#                     "category_slug": category.slug,
+#                     "category_icon": request.build_absolute_uri(category.icon.url) if category.icon else None,
+#                     "display_order": category.display_order,
+#                     "products_count": category_products.count(),
+#                     "products": product_serializer.data
+#                 }
+                
+#                 response_data.append(category_data)
+            
+#             return Response({
+#                 "code": status.HTTP_200_OK,
+#                 "status": "success",
+#                 "message": "Categories with products fetched successfully",
+#                 "data": response_data
+#             })
+            
+#         except Exception as e:
+#             logger.exception(str(e))
+#             return Response({
+#                 "code": status.HTTP_500_INTERNAL_SERVER_ERROR,
+#                 "status": "error",
+#                 "message": "Failed to fetch categories with products",
+#                 "errors": {"server_error": [str(e)]}
+#             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+from django.db.models import Prefetch, Count, Subquery, OuterRef
+
+
+class TopFiveCategoriesProductView(APIView):
+    """
+    Get top 5 categories with their products (optimized)
+    """
+    
+    
+    def get(self, request):
+        try:
+            # SINGLE QUERY SOLUTION: Get all required data in one optimized query            
+            # Subquery to get latest product IDs for each category
+            # latest_product_subquery = models.Product.objects.filter(
+            #     category_id=OuterRef('pk'),
+            #     status="published"
+            # ).order_by('-created_at').values('id')[:10]
+            
+            # Get categories with products in a single query
+            categories = Category.objects.filter(
+                is_active=True
+            ).order_by('display_order')[:5].prefetch_related(
+                Prefetch(
+                    'products',
+                    queryset=models.Product.objects.filter(
+                        status="published"
+                    ).select_related(
+                        'store', 'brand', 'category'
+                    ).only(
+                        'id', 'slug', 'title', 'type', 'description',
+                        'base_price', 'main_image', 'stock', 'is_featured',
+                        'status', 'store_id', 'brand_id', 'category_id'
+                    ).order_by('-created_at')[:10],
+                    to_attr='category_products'
+                )
+            ).annotate(
+                products_count=Count('products', filter=Q(products__status="published"))
+            )
+            
+            # Prepare response data
+            response_data = []
+            
+            for category in categories:
+                # Get products directly from prefetched data
+                category_products = getattr(category, 'category_products', [])
+                
+                # Serialize products
+                product_serializer = serializers.ProductSerializerView(
+                    category_products,
+                    many=True,
+                )
+                
+                category_data = {
+                    "category_id": category.id,
+                    "category_name": category.name,
+                    "category_slug": category.slug,
+                    "display_order": category.display_order,
+                    "products_count": getattr(category, 'products_count', len(category_products)),
+                    "products": product_serializer.data
+                }
+                
+                response_data.append(category_data)
+            
+            return Response({
+                "code": status.HTTP_200_OK,
+                "status": "success",
+                "message": "Categories with products fetched successfully",
+                "data": response_data
+            })
+            
+        except Exception as e:
+            logger.exception(str(e))
+            return Response({
+                "code": status.HTTP_500_INTERNAL_SERVER_ERROR,
+                "status": "error",
+                "message": "Failed to fetch categories with products",
                 "errors": {"server_error": [str(e)]}
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

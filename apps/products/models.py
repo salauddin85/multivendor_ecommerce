@@ -19,7 +19,7 @@ class ProductBaseModel(models.Model):
 # Product Model
 class Product(ProductBaseModel):
     store = models.ForeignKey(Store, on_delete=models.CASCADE, related_name="products",db_index=True, null=True, blank=True)
-    category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, blank=True, db_index=True)
+    category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, blank=True, db_index=True, related_name="products")
     brand = models.ForeignKey(Brand, on_delete=models.SET_NULL, null=True, blank=True, db_index=True)
     title = models.CharField(max_length=500)
     slug = models.SlugField(unique=True, max_length=255)
@@ -44,7 +44,14 @@ class Product(ProductBaseModel):
                 counter += 1
             self.slug = slug
         super().save(*args, **kwargs)
-
+        
+    class Meta:
+        indexes = [
+            models.Index(fields=['category', 'status', 'created_at']),
+            models.Index(fields=['status', 'created_at']),
+            models.Index(fields=['category', 'status']),
+        ]
+        
     def __str__(self):
         return self.title
 
