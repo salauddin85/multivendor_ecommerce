@@ -178,9 +178,9 @@ class SSLCommerzService:
                     order.save()
                     
                     # Create platform holds
-                    PaymentProcessingService.create_platform_holds(order)
+                    # PaymentProcessingService.create_platform_holds(order)
                 
-                return {'success': True, 'order': payment.order, 'payment': payment}
+                return {'success': True, 'order': payment.order, 'payment': payment }
             else:
                 payment.status = 'failed'
                 payment.gateway_response = validation
@@ -212,10 +212,10 @@ class PaymentProcessingService:
             
             # Get commission rate
             commission_rate_obj = CommissionRate.objects.filter(
-                store_type=store.type
+                store_type=store.type if store else None
             ).first()
             
-            commission_rate = commission_rate_obj.rate if commission_rate_obj else Decimal('10.00')
+            commission_rate = commission_rate_obj.rate if commission_rate_obj else Decimal('0.00')
             
             # Calculate amounts
             item_amount = item.subtotal

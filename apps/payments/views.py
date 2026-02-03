@@ -10,6 +10,8 @@ from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from decimal import Decimal
 import logging
+from urllib.parse import urlencode
+from django.shortcuts import redirect
 
 from .services import (
     SSLCommerzService, 
@@ -114,19 +116,30 @@ class SSLCommerzSuccessView(APIView):
         try:
             ssl_service = SSLCommerzService()
             result = ssl_service.handle_success_callback(request.data)
-            
+
             if result['success']:
                 # Redirect to success page
-                return Response({
-                    "code": status.HTTP_200_OK,
-                    "status": "success",
-                    "message": "Payment successful",
-                    "data": {"order_id": result['order'].id,
-                             "status": result['order'].payment_status,
-                             "payment_id": result['payment'].id,
-                             "transaction_id": result['payment'].transaction_id,
-                             }
-                }, status=status.HTTP_200_OK)
+                # return Response({
+                #     "code": status.HTTP_200_OK,
+                #     "status": "success",
+                #     "message": "Payment successful",
+                #     "data": {"order_id": result['order'].id,
+                #              "status": result['order'].payment_status,
+                #              "payment_id": result['payment'].id,
+                #              "transaction_id": result['payment'].transaction_id,
+                #              }
+                # }, status=status.HTTP_200_OK)
+                
+
+                params = urlencode({
+                    "order_id": result["order"].id,
+                    "status": result["order"].payment_status,
+                    "payment_id": result["payment"].id,
+                    "transaction_id": result["payment"].transaction_id,
+                })
+
+                return redirect(f"http://localhost:3000/payments/success/?{params}")
+
             else:
                 return Response({
                     "code": status.HTTP_400_BAD_REQUEST,
@@ -171,17 +184,25 @@ class SSLCommerzFailView(APIView):
                 
                 logger.info(f"Payment failed for transaction: {transaction_id}")
                 
-                return Response({
-                    "code": status.HTTP_200_OK,
+                # return Response({
+                #     "code": status.HTTP_200_OK,
+                #     "status": "failed",
+                #     "message": "Payment failed",
+                #     "data": {
+                #         "order_id": payment.order.id,
+                #         "transaction_id": transaction_id,
+                #         "status": "failed",
+                #         "payment_id": payment.id if payment else None
+                #     }
+                # }, status=status.HTTP_200_OK)
+                params = urlencode({
+                    "order_id": payment.order.id,
                     "status": "failed",
-                    "message": "Payment failed",
-                    "data": {
-                        "order_id": payment.order.id,
-                        "transaction_id": transaction_id,
-                        "status": "failed",
-                        "payment_id": payment.id if payment else None
-                    }
-                }, status=status.HTTP_200_OK)
+                    "payment_id": payment.id if payment else None,
+                    "transaction_id": transaction_id
+                })
+
+                return redirect(f"http://localhost:3000/payments/failure/?{params}")
                 
             except Payment.DoesNotExist:
                 logger.warning(f"Payment not found for transaction: {transaction_id}")
@@ -227,17 +248,25 @@ class SSLCommerzCancelView(APIView):
             
                 logger.info(f"Payment cancelled for transaction: {transaction_id}")
                 
-                return Response({
-                    "code": status.HTTP_200_OK,
+                # return Response({
+                #     "code": status.HTTP_200_OK,
+                #     "status": "cancelled",
+                #     "message": "Payment cancelled by user",
+                #     "data": {
+                #         "order_id": payment.order.id,
+                #         "transaction_id": transaction_id,
+                #         "status": "cancelled",
+                #         "payment_id": payment.id if payment else None
+                #     }
+                # }, status=status.HTTP_200_OK)
+                params = urlencode({
+                    "order_id": payment.order.id,
                     "status": "cancelled",
-                    "message": "Payment cancelled by user",
-                    "data": {
-                        "order_id": payment.order.id,
-                        "transaction_id": transaction_id,
-                        "status": "cancelled",
-                        "payment_id": payment.id if payment else None
-                    }
-                }, status=status.HTTP_200_OK)
+                    "payment_id": payment.id if payment else None,
+                    "transaction_id": transaction_id
+                })
+
+                return redirect(f"http://localhost:3000/payments/cancelled/?{params}")
                 
             except Payment.DoesNotExist:
                 logger.warning(f"Payment not found for transaction: {transaction_id}")
@@ -258,7 +287,97 @@ class SSLCommerzCancelView(APIView):
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+class VerifyPaymentView(APIView):
+    permission_classes = [IsAuthenticated]
 
+    def post(self, request):
+        try:
+            tran_id = request.data.get("tran_id")
+            val_id = request.data.get("val_id")
+
+            #  Validate request data
+            if not tran_id or not val_id:
+                return Response({
+                    "code": status.HTTP_400_BAD_REQUEST,
+                    "status": "failed",
+                    "message": "Missing required fields",
+                    "errors": {
+                        "tran_id": ["Transaction ID is required"],
+                        "val_id": ["Validation ID is required"],
+                    }
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            #  Fetch payment
+            try:
+                payment = Payment.objects.select_related("order").get(
+                    transaction_id=tran_id
+                )
+            except Payment.DoesNotExist:
+                return Response({
+                    "code": status.HTTP_404_NOT_FOUND,
+                    "status": "failed",
+                    "message": "Payment not found",
+                    "errors": {
+                        "payment": ["Payment record not found"],
+                    }
+                }, status=status.HTTP_404_NOT_FOUND)
+
+            #  Prevent double verification
+            if payment.status == "completed":
+                return Response({
+                    "code": status.HTTP_200_OK,
+                    "status": "success",
+                    "message": "Payment already verified",
+                    "data": {
+                        "order_id": payment.order.id
+                    }
+                }, status=status.HTTP_200_OK)
+
+            #  Validate with SSLCommerz
+            ssl_service = SSLCommerzService()
+            validation = ssl_service.validate_payment(val_id)
+
+            if validation.get("status") not in ["VALID", "VALIDATED"]:
+                return Response({
+                    "code": status.HTTP_400_BAD_REQUEST,
+                    "status": "failed",
+                    "message": "Payment validation failed",
+                    "errors": validation
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            #  Atomic DB update
+            with transaction.atomic():
+                payment.status = "completed"
+                payment.val_id = val_id
+                payment.gateway_response = validation
+                payment.save()
+
+                order = payment.order
+                order.payment_status = "paid"
+                order.status = "confirmed"
+                order.save()
+
+            return Response({
+                "code": status.HTTP_200_OK,
+                "status": "success",
+                "message": "Payment verified successfully",
+                "data": {
+                    "order_id": order.id,
+                    "transaction_id": payment.transaction_id
+                }
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            logger.exception("VerifyPaymentView error")
+
+            return Response({
+                "code": status.HTTP_500_INTERNAL_SERVER_ERROR,
+                "status": "error",
+                "message": "Payment verification failed",
+                "errors": {
+                    "server_error": [str(e)]
+                }
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 # ==========================================
 # WALLET VIEWS (Vendor/Company)

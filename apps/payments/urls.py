@@ -13,6 +13,7 @@ urlpatterns = [
     path('v1/payments/sslcommerz/fail/', views.SSLCommerzFailView.as_view(), name='sslcommerz_fail'),
     path('v1/payments/sslcommerz/cancel/', views.SSLCommerzCancelView.as_view(), name='sslcommerz_cancel'),
     
+    path('v1/payments/verify/', views.VerifyPaymentView.as_view(), name='payment_verify'),
     # Wallet
     path('v1/payments/wallets/', views.WalletView.as_view(), name='wallet'),
     path('v1/payments/wallets/list/', views.WalletListView.as_view(), name='wallets_list'),

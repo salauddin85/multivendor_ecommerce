@@ -319,14 +319,14 @@ SIMPLE_JWT = {
 
 
 # SSLCommerz Configuration
-SSLCOMMERZ_STORE_ID = os.getenv('SSLCOMMERZ_STORE_ID', default='your_store_id')
-SSLCOMMERZ_STORE_PASSWORD = os.getenv('SSLCOMMERZ_STORE_PASSWORD', default='your_store_password')
-SSLCOMMERZ_IS_SANDBOX = os.getenv('SSLCOMMERZ_IS_SANDBOX', default=True)
+SSLCOMMERZ_STORE_ID = os.getenv('SSLCOMMERZ_STORE_ID')
+SSLCOMMERZ_STORE_PASSWORD = os.getenv('SSLCOMMERZ_STORE_PASSWORD')
+SSLCOMMERZ_IS_SANDBOX = os.getenv('SSLCOMMERZ_IS_SANDBOX')
 
 # Payment callback URLs (use ngrok for local testing)
-SSLCOMMERZ_SUCCESS_URL = os.getenv('SSLCOMMERZ_SUCCESS_URL', default='http://localhost:8000/api/payments/v1/payments/sslcommerz/success/')
-SSLCOMMERZ_FAIL_URL = os.getenv('SSLCOMMERZ_FAIL_URL', default='http://localhost:8000/api/payments/v1/payments/sslcommerz/fail/')
-SSLCOMMERZ_CANCEL_URL = os.getenv('SSLCOMMERZ_CANCEL_URL', default='http://localhost:8000/api/payments/v1/payments/sslcommerz/cancel/')
-SSLCOMMERZ_IPN_URL = os.getenv('SSLCOMMERZ_IPN_URL', default='http://localhost:8000/api/payments/v1/payments/sslcommerz/ipn/')
+SSLCOMMERZ_SUCCESS_URL = os.getenv('SSLCOMMERZ_SUCCESS_URL')
+SSLCOMMERZ_FAIL_URL = os.getenv('SSLCOMMERZ_FAIL_URL')
+SSLCOMMERZ_CANCEL_URL = os.getenv('SSLCOMMERZ_CANCEL_URL')
+SSLCOMMERZ_IPN_URL = os.getenv('SSLCOMMERZ_IPN_URL')
 
 
