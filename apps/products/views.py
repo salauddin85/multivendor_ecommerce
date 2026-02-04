@@ -140,17 +140,22 @@ class ProductsDetailView(APIView):
 
     def get(self, request, slug):
         try:
-            # Fetch product with relations
             product = models.Product.objects.select_related(
-                'store', 'category', 'brand'
+                "store", "category", "brand"
             ).prefetch_related(
-                'images', 'attributes', 'variants'
+                "images", "attributes", "variants"
             ).get(slug=slug)
-            # 
-            view_count = product.view_count
-            product.view_count = view_count + 1
-            product.save()
 
+            # ==============================
+            # Session based view count logic
+            # ==============================
+            session_key = f"viewed_product_{product.id}"
+
+            if not request.session.get(session_key):
+                with transaction.atomic():
+                    product.view_count += 1
+                    product.save(update_fields=["view_count"])
+                    request.session[session_key] = True
 
             serializer = serializers.ProductDetailSerializer(product)
 
@@ -200,7 +205,6 @@ class ProductsDetailView(APIView):
                     "server_error": [str(e)]
                 }
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
     def patch(self, request, slug):
         try:
             product = models.Product.objects.get(slug=slug)

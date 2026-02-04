@@ -33,7 +33,7 @@ def custom_exception_handler(exc, context):
         return Response({
             "code": 401,
             "status": "failed",
-            "message": "Token is invalid or expired.",
+            "message": "Token is invalid or expired.Please login.",
             "errors": {
                 "token": ["Token is invalid or expired"]
             }

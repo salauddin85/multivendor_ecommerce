@@ -2,6 +2,8 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
+   path('v1/shipping_configuration/',views.ShippingConfigurationView.as_view(),name="shipping_configuration"),
+   path('v1/shipping_configuration/<int:pk>/',views.ShippingConfigurationDetailView.as_view(),name="detail_shipping_configuration"),
    path('v1/orders/address/',views.ShippingAddressView.as_view(),name="shipping_address"),
    path('v1/orders/address/<int:pk>/',views.ShippingAddressDetailView.as_view(),name="detail_shipping_address"),
    path('v1/orders/',views.OrderView.as_view(),name="order_view"),

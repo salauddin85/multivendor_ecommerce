@@ -509,8 +509,50 @@ class StoreOrderListView(APIView):
             
             
 class ShippingConfigurationView(APIView):
-    permission_classes = [IsAuthenticated]
+   
+    def get_permissions(self):
+        if self.request.method == "POST":
+            return [IsAuthenticated(),IsAdminUser()]
+        else:
+            return [IsAuthenticated()]
+    def post(self, request):
+        try:
+            serializer = serializers.ShippingConfigurationPostSerializer(data=request.data)
+            if serializer.is_valid():
+                serializer.save()
+                log_request(request, "Created shipping configuration", "info",
+                            "Shipping configuration created successfully", response_status_code=status.HTTP_201_CREATED)
+                return Response(
+                    {
+                        "code": status.HTTP_201_CREATED,
+                        "status": "success",
+                        "message": "Shipping configuration created successfully.",
+                        "data": serializer.data,
+                    },
+                    status=status.HTTP_201_CREATED,
+                )
 
+            else:
+                return Response(
+                    {
+                        "code": status.HTTP_400_BAD_REQUEST,
+                        "status": "failed",
+                        "message": "Invalid data.",
+                        "errors": serializer.errors,
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+                
+        except Exception as e:
+            logger.exception(str(e))
+            log_request(request, "Error creating shipping configuration", "error",
+                        "An error occurred while creating shipping configuration", response_status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({
+                "code": status.HTTP_500_INTERNAL_SERVER_ERROR,
+                "status": "failed",
+                "message": "An error occurred while creating shipping configuration.",
+                "errors": {"server_error": [str(e)]},
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     def get(self, request):
         try:
             config = models.ShippingConfiguration.objects.all()
@@ -537,8 +579,62 @@ class ShippingConfigurationView(APIView):
                 "message": "An error occurred while retrieving shipping configuration.",
                 "errors": {"server_error": [str(e)]},
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-            
-            
+ 
+class ShippingConfigurationDetailView(APIView):
+    def patch(self, request, pk):
+        try:
+            config = models.ShippingConfiguration.objects.get(pk=pk)
+            serializer = serializers.ShippingConfigurationSerializer(data=request.data, instance=config, partial=True)
+            if serializer.is_valid():
+                obj=serializer.save()
+                
+                log_request(request, "Updated shipping configuration", "info",
+                            "Shipping configuration updated successfully", response_status_code=status.HTTP_200_OK)
+                return Response(
+                    {
+                        "code": status.HTTP_200_OK,
+                        "status": "success",
+                        "message": "Shipping configuration updated successfully.",
+                        "data":{
+                            "shipping_configuration_id": obj.id,
+                            "shipping_fee": obj.shipping_fee,
+                            "location_name": obj.location_name
+                            },
+                    },
+                    status=status.HTTP_200_OK,
+                )
+
+            else:
+                return Response(
+                    {
+                        "code": status.HTTP_400_BAD_REQUEST,
+                        "status": "failed",
+                        "message": "Invalid data.",
+                        "errors": serializer.errors,
+                    }
+                )     
+        except models.ShippingConfiguration.DoesNotExist:
+            return Response(
+                {
+                    "code": status.HTTP_404_NOT_FOUND,
+                    "status": "failed",
+                    "message": "Shipping configuration not found.",
+                    "errors": {
+                        "shipping_configuration_id": [f"Shipping configuration not found with id {pk}"]
+                    },
+                },
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        except Exception as e:
+            logger.exception(str(e))
+            log_request(request, "Error updating shipping configuration", "error",
+                        "An error occurred while updating shipping configuration", response_status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({
+                "code": status.HTTP_500_INTERNAL_SERVER_ERROR,
+                "status": "failed",
+                "message": "An error occurred while updating shipping configuration.",
+                "errors": {"server_error": [str(e)]},
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class OrderConfirmationView(APIView):
@@ -658,3 +754,5 @@ class AddExistingAddressToOrderView(APIView):
                 "message": "An error occurred while adding existing address to order.",
                 "errors": {"server_error": [str(e)]},
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+

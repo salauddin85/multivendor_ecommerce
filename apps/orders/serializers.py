@@ -275,6 +275,45 @@ class OrderDetailSerializerView(serializers.ModelSerializer):
         # depth = 1
         
 
+class ShippingConfigurationPostSerializer(serializers.Serializer):
+    location_name = serializers.CharField(max_length=100)
+    shipping_fee = serializers.DecimalField(max_digits=10, decimal_places=2)
+    
+    def validate_location_name(self, value):
+        value = value.strip()
+        value = value.lower()
+        city = ["inside dhaka", "outside dhaka"]
+        
+        if value not in city:
+            raise serializers.ValidationError("Location name is not valid.Location name must be Inside Dhaka or Outside Dhaka.")
+        
+        if self.instance:
+            if self.instance.location_name == value:
+                return value
+        if len(value) < 3:
+            raise serializers.ValidationError("Location name is too short.")
+       
+        if models.ShippingConfiguration.objects.filter(location_name=value).exists():
+            raise serializers.ValidationError(f"Location name {value} already exists.")
+        return value
+    
+    def validate_shipping_fee(self, value):
+        if value < 0:
+            raise serializers.ValidationError("Shipping fee cannot be negative.")
+        if value > 500:
+            raise serializers.ValidationError("Shipping fee cannot be more than 500.")
+        value = Decimal(value)
+        return value
+    
+    def create(self, validated_data):
+        configuration_obj =  models.ShippingConfiguration.objects.create(**validated_data)
+        return configuration_obj
+    
+    def update(self, instance, validated_data):
+        instance.shipping_fee = validated_data.get('shipping_fee', instance.shipping_fee)
+        instance.save(update_fields=['shipping_fee'])
+        return instance
+
 class ShippingConfigurationSerializer(serializers.ModelSerializer):
     class Meta:
         model = models.ShippingConfiguration
