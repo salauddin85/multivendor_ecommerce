@@ -76,7 +76,8 @@ class CategorySerializer(serializers.Serializer):
                     )
                     
         return parent_category
-            
+    
+    
     
     def create(self, validated_data):
         category = Category.objects.create(**validated_data)

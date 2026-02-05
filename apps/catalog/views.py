@@ -106,6 +106,7 @@ class CategoryDetailView(APIView):
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def patch(self, request, slug):
+       
         try:
             category = Category.objects.get(slug=slug)
             serializer = serializers.CategorySerializer(category, data=request.data, partial=True)

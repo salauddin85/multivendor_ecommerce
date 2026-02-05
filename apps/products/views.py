@@ -84,7 +84,8 @@ class ProductsView(APIView):
             store = request.GET.get("store")
             min_price = request.GET.get("min_price")
             max_price = request.GET.get("max_price")
-            new_arrival = request.GET.get("new_arrival")
+            new_arrival = request.GET.get("new_arrival", "").lower() == "true"
+
 
             if brand:
                 filters &= Q(brand__slug=brand)
@@ -104,8 +105,7 @@ class ProductsView(APIView):
                 filters &= Q(base_price__lte=Decimal(max_price))
 
             queryset = queryset.filter(filters)
-
-            if new_arrival=="true":
+            if new_arrival:
                 queryset = queryset.order_by("-created_at")
             else:
                 queryset = queryset.order_by("id")
