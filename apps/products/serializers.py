@@ -48,6 +48,7 @@ class ProductSerializer(serializers.Serializer):
     stock = serializers.IntegerField(default=0)
     discount_amount = serializers.DecimalField(max_digits=10, decimal_places=2,required=False, allow_null=True)
     is_featured = serializers.BooleanField(default=False)
+    specification = serializers.CharField(required=False)
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -85,8 +86,9 @@ class ProductSerializer(serializers.Serializer):
             stock = validated_data.get('stock')
             is_featured = validated_data.get('is_featured')
             discount_amount = validated_data.get('discount_amount', 0.00)
+            specification = validated_data.get('specification', '')
 
-            product = models.Product.objects.create(store=store, category=category, brand=brand, title=title, type=type, description=description, base_price=base_price, main_image=main_image, stock=stock, is_featured=is_featured, discount_amount=discount_amount)
+            product = models.Product.objects.create(store=store, category=category, brand=brand, title=title, type=type, description=description, base_price=base_price, main_image=main_image, stock=stock, is_featured=is_featured, discount_amount=discount_amount, specification=specification)
             
             if 'gallery_images' in validated_data:
                 gallery_images_data = validated_data.get('gallery_images', [])
@@ -113,6 +115,8 @@ class ProductSerializer(serializers.Serializer):
             instance.main_image = validated_data.get('main_image', instance.main_image)
             instance.stock = validated_data.get('stock', instance.stock)
             instance.is_featured = validated_data.get('is_featured', instance.is_featured)
+            instance.discount_amount = validated_data.get('discount_amount', instance.discount_amount)
+            instance.specification = validated_data.get('specification', instance.specification)
             instance.save()
 
             if 'gallery_images' in validated_data:
