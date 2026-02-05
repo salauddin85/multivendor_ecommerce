@@ -46,6 +46,7 @@ class ProductSerializer(serializers.Serializer):
         child=serializers.ImageField(), required=False
     )
     stock = serializers.IntegerField(default=0)
+    discount_amount = serializers.DecimalField(max_digits=10, decimal_places=2,required=False, allow_null=True)
     is_featured = serializers.BooleanField(default=False)
     
     def __init__(self, *args, **kwargs):
@@ -54,6 +55,21 @@ class ProductSerializer(serializers.Serializer):
         if self.instance:
             self.fields['main_image'].required = False
             self.fields['gallery_images'].required = False
+    
+    def validate(self, attrs):
+        type = attrs.get('type')
+        if type not in ['simple', 'variable']:
+            raise serializers.ValidationError('Type must be either "simple" or "variable".')
+        if type == 'variable':
+            base_price = attrs.get('base_price')
+            stock = attrs.get('stock')
+            if base_price or stock:
+                raise serializers.ValidationError('Base price and stock are not allowed for variable products.You should add variants.')
+                
+            attrs['base_price'] = 0.00
+            attrs['stock'] = 0
+        
+        return attrs
     
     @transaction.atomic
     def create(self, validated_data):
@@ -68,8 +84,9 @@ class ProductSerializer(serializers.Serializer):
             main_image = validated_data.get('main_image')
             stock = validated_data.get('stock')
             is_featured = validated_data.get('is_featured')
+            discount_amount = validated_data.get('discount_amount', 0.00)
 
-            product = models.Product.objects.create(store=store, category=category, brand=brand, title=title, type=type, description=description, base_price=base_price, main_image=main_image, stock=stock, is_featured=is_featured)
+            product = models.Product.objects.create(store=store, category=category, brand=brand, title=title, type=type, description=description, base_price=base_price, main_image=main_image, stock=stock, is_featured=is_featured, discount_amount=discount_amount)
             
             if 'gallery_images' in validated_data:
                 gallery_images_data = validated_data.get('gallery_images', [])
@@ -303,6 +320,7 @@ class ProductVariantSerializer(serializers.Serializer):
     discount_price = serializers.DecimalField(max_digits=10, decimal_places=2, required=False)
     stock = serializers.IntegerField(default=0)
     image = serializers.ImageField(required=False, allow_null=True)
+    is_default = serializers.BooleanField(required=True)
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -329,6 +347,7 @@ class ProductVariantSerializer(serializers.Serializer):
         return value
 
     def create(self, validated_data):
+       
        variant = models.ProductVariant.objects.create(**validated_data)
        return variant
     

@@ -31,6 +31,7 @@ class Product(ProductBaseModel):
     status = models.CharField(max_length=20, choices=STATUS, default="draft")
     is_featured = models.BooleanField(default=False)
     view_count = models.IntegerField(default=0)
+    discount_amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     avg_rating = models.DecimalField(max_digits=3, decimal_places=2, default='0.00')
     total_reviews = models.IntegerField(default=0)
 
@@ -105,7 +106,18 @@ class ProductVariant(ProductBaseModel):
     discount_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     stock = models.IntegerField(default=0)
     image = models.ImageField(upload_to="products/variant_images/", null=True, blank=True)
+    is_default = models.BooleanField(default=False)
 
+    def save(self, *args, **kwargs):
+        if self.is_default:
+            ProductVariant.objects.filter(
+                product=self.product, is_default=True
+            ).exclude(pk=self.pk).update(is_default=False)
+        super().save(*args, **kwargs)
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['product', 'sku'], name='unique_product_variant')
+        ]
     def __str__(self):
         return f"{self.variant_name} ({self.product.title})"
 

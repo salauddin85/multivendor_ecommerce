@@ -34,7 +34,6 @@ class ProductsView(APIView):
     def post(self, request):
         try:
             data = request.data
-            print(data)
             serializer = serializers.ProductSerializer(data=data)
             if serializer.is_valid():
                 instance = serializer.save()
