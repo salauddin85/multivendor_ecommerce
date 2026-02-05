@@ -160,6 +160,10 @@ AUTH_USER_MODEL = 'authentication.CustomUser'
 
 
 REST_FRAMEWORK = {
+    'DEFAULT_RENDERER_CLASSES': [
+    'rest_framework.renderers.JSONRenderer',
+    'rest_framework.renderers.BrowsableAPIRenderer', 
+],
     'DEFAULT_AUTHENTICATION_CLASSES': ['rest_framework_simplejwt.authentication.JWTAuthentication'],
     'EXCEPTION_HANDLER': 'apps.authentication.utils.exceptions.custom_exception_handler',
     'DEFAULT_THROTTLE_CLASSES': [

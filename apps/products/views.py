@@ -1323,7 +1323,7 @@ class LatestProductsView(APIView):
             # Filter only published products
             queryset = models.Product.objects.select_related('brand','category','store').filter(
                 status="published"
-            ).order_by("-created_at")[:15]
+            ).order_by("-created_at")[:16]
                 
             serializer = serializers.ProductSerializerView(queryset, many=True)
             
@@ -1375,17 +1375,17 @@ class BestSellingProductsView(APIView):
             
             # If there are not enough products with sales data,
             # add more published products
-            if len(ordered_products) < 15:
+            if len(ordered_products) < 16:
                 additional_products = models.Product.objects.filter(
                     status="published"
                 ).exclude(
                     id__in=product_ids
-                ).order_by("-created_at")[:15 - len(ordered_products)]
+                ).order_by("-created_at")[:16 - len(ordered_products)]
                 ordered_products.extend(list(additional_products))
             
             # Apply pagination with page size 15
             paginator = CustomPageNumberPagination()
-            paginator.page_size = 15
+            paginator.page_size = 16
             
             # Paginate the ordered_products list
             paginated_products = paginator.paginate_queryset(ordered_products, request, view=self)
