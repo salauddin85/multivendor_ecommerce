@@ -136,6 +136,16 @@ class CategoryDetailView(APIView):
                 "data": {"detail": "Category with this ID does not exist."}
             }, status=status.HTTP_404_NOT_FOUND)
 
+        except Exception as e:
+            logger.exception(str(e))
+            log_request(request, "Category update failed", "error","Category update failed due to server error", response_status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+            return Response({
+                "code": status.HTTP_500_INTERNAL_SERVER_ERROR,
+                "status": "failed",
+                "message": "internal server error",
+                "errors": {"server_error": [str(e)]}
+            })
     def delete(self, request, slug):
         try:
             category = Category.objects.get(slug=slug)
@@ -274,6 +284,9 @@ class BrandDetailView(APIView):
                 "errors": {"detail": "Brand with this ID does not exist."}
             }, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
+            logger.exception(str(e))
+            log_request(request, "Brand fetch failed", "error","Brand fetch failed due to server error", response_status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
             return Response({
                 "code": status.HTTP_500_INTERNAL_SERVER_ERROR,
                 "status": "failed",
@@ -308,6 +321,9 @@ class BrandDetailView(APIView):
                 "errors": {"detail": "Brand with this ID does not exist."}
             }, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
+            logger.exception(str(e))
+            log_request(request, "Brand update failed", "error","Brand update failed due to server error", response_status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
             return Response({
                 "code": status.HTTP_500_INTERNAL_SERVER_ERROR,
                 "status": "failed",
@@ -332,6 +348,186 @@ class BrandDetailView(APIView):
                 "errors": {"detail": "Brand with this ID does not exist."}
             }, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
+            logger.exception(str(e))
+            log_request(request, "Brand deletion failed", "error","Brand deletion failed due to server error", response_status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+            return Response({
+                "code": status.HTTP_500_INTERNAL_SERVER_ERROR,
+                "status": "failed",
+                "message": "internal server error",
+                "errors": {"server_error": [str(e)]}
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+            
+
+class CategoryGridImageView(APIView):
+    
+    def post(self,request):
+        try:
+            data = request.data
+            serializer = serializers.CategoryGridImageSerializer(data=data)
+            if serializer.is_valid():
+                obj = serializer.save()
+                log_request(request, f"Category grid image  {obj.id} created", "info", f"Category grid image {obj.id}  created successfully", response_status_code=status.HTTP_201_CREATED)
+                return Response({
+                    "code": status.HTTP_201_CREATED,
+                    "status": "success",
+                    "message": "Category grid image created successfully",
+                    "data": serializer.data
+                }, status=status.HTTP_201_CREATED)
+            else:
+                return Response({
+                    "code": status.HTTP_400_BAD_REQUEST,
+                    "status": "failed",
+                    "message": "invalid request",
+                    "errors": serializer.errors
+                }, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            logger.exception(str(e))
+            log_request(request, "Category grid image creation failed", "error","Category grid image creation failed due to server error", response_status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({
+                "code": status.HTTP_500_INTERNAL_SERVER_ERROR,
+                "status": "failed",
+                "message": "internal server error",
+                "errors": {"server_error": [str(e)]}
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    
+    def get(self, request):
+        try:
+            categories_grid_image = models.CategoryGridImage.objects.select_related('category').all().order_by("-display_order", "created_at")
+            serializer = serializers.CategoryGridImageSerializerForView(categories_grid_image, many=True)
+            log_request(request, "All category grid images fetched", "info", "All category grid images fetched successfully", response_status_code=status.HTTP_200_OK)
+            return Response({
+                "code": status.HTTP_200_OK,
+                "status": "success",
+                "message": "Category fetched successfully",
+                "data": serializer.data
+            }, status=status.HTTP_200_OK)
+        except Exception as e:
+            logger.exception(str(e))
+            log_request(request, "Category grid image fetch failed", "error","Category grid image fetch failed due to server error", response_status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+            return Response({
+                "code": status.HTTP_500_INTERNAL_SERVER_ERROR,
+                "status": "failed",
+                "message": "internal server error",
+                "errors": {"server_error": [str(e)]}
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+            
+class CarouselImageView(APIView):
+    
+    def post(self,request):
+        try:
+            data = request.data
+            serializer = serializers.CarouselImageSerializer(data=data)
+            if serializer.is_valid():
+                obj = serializer.save()
+               
+                log_request(request, f"Carousel image  {obj.id} created", "info", f"Carousel image {obj.id}  created successfully", response_status_code=status.HTTP_201_CREATED)
+                return Response({
+                    "code": status.HTTP_201_CREATED,
+                    "status": "success",
+                    "message": "Carousel image created successfully",
+                    "data": serializer.data
+                }, status=status.HTTP_201_CREATED)
+            else:
+                return Response({
+                    "code": status.HTTP_400_BAD_REQUEST,
+                    "status": "failed",
+                    "message": "invalid request",
+                    "errors": serializer.errors
+                }, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            logger.exception(str(e))
+            log_request(request, "Carousel image creation failed", "error","Carousel image creation failed due to server error", response_status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+            return Response({
+                "code": status.HTTP_500_INTERNAL_SERVER_ERROR,
+                "status": "failed",
+                "message": "internal server error",
+                "errors": {"server_error": [str(e)]}
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    
+    def get(self, request):
+        try:
+            carousel_image = models.CarouselImage.objects.select_related('category').all().order_by('-display_order', 'created_at')
+            serializer = serializers.CarouselImageSerializerForView(carousel_image, many=True)
+            log_request(request, "All carousel images fetched", "info", "All carousel images fetched successfully", response_status_code=status.HTTP_200_OK)
+            return Response({
+                "code": status.HTTP_200_OK,
+                "status": "success",
+                "message": "Carousel fetched successfully",
+                "data": serializer.data
+            }, status=status.HTTP_200_OK)
+        except Exception as e:
+            logger.exception(str(e))
+            log_request(request, "Carousel image fetch failed", "error","Carousel image fetch failed due to server error", response_status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({
+                "code": status.HTTP_500_INTERNAL_SERVER_ERROR,
+                "status": "failed",
+                "message": "internal server error",
+                "errors": {"server_error": [str(e)]}
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+            
+            
+class CarouselImageDetailView(APIView):
+    
+    def delete(self, request, pk):
+        try:
+            carousel_image = models.CarouselImage.objects.get(pk=pk)
+            carousel_image.delete()
+            log_request(request, "Carousel image deleted", "info", "Carousel image deleted successfully", response_status_code=status.HTTP_200_OK)
+            return Response({
+                "code": status.HTTP_200_OK,
+                "status": "success",
+                "message": "Carousel image deleted successfully",
+            }, status=status.HTTP_200_OK)
+        except models.CarouselImage.DoesNotExist:
+            return Response({
+                "code": status.HTTP_404_NOT_FOUND,
+                "status": "failed",
+                "message": "Carousel image not found",
+                "errors": {"carousel_image_id": [f"Carousel image not found with id {pk}"]}
+            }, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            logger.exception(str(e))
+            log_request(request, "Carousel image deletion failed", "error","Carousel image deletion failed due to server error", response_status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+            return Response({
+                "code": status.HTTP_500_INTERNAL_SERVER_ERROR,
+                "status": "failed",
+                "message": "internal server error",
+                "errors": {"server_error": [str(e)]}
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+
+class CategoryGridDetailView(APIView):
+    
+    def delete(self, request, pk):
+        try:
+            category_grid = models.CategoryGridImage.objects.get(pk=pk)
+            category_grid.delete()
+            log_request(request, "Category grid image deleted", "info", "Category grid image deleted successfully", response_status_code=status.HTTP_200_OK)
+            return Response({
+                "code": status.HTTP_200_OK,
+                "status": "success",
+                "message": "Category grid image deleted successfully",
+            }, status=status.HTTP_200_OK)
+        except models.CategoryGridImage.DoesNotExist:
+            return Response({
+                "code": status.HTTP_404_NOT_FOUND,
+                "status": "failed",
+                "message": "Category grid image not found",
+                "errors": {"category_grid_id": [f"Category grid image not found with id {pk}"]}
+            }, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            logger.exception(str(e))
+            log_request(request, "Category grid image deletion failed", "error","Category grid image deletion failed due to server error", response_status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
             return Response({
                 "code": status.HTTP_500_INTERNAL_SERVER_ERROR,
                 "status": "failed",

@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Category, Brand
+from .models import Category, Brand,CategoryGridImage,CarouselImage
 from django.utils import timezone
 
 
@@ -174,4 +174,34 @@ class BrandDetailSerializer(serializers.ModelSerializer):
         model = Brand
         fields = '__all__'
        
+       
+class CategoryGridImageSerializer(serializers.Serializer):
+    category = serializers.PrimaryKeyRelatedField(queryset=Category.objects.all())
+    image = serializers.ImageField()
+    display_order = serializers.IntegerField(default=0)
     
+    def create(self, validated_data):
+        category_grid_image = CategoryGridImage.objects.create(**validated_data)
+        return category_grid_image
+
+class CategoryGridImageSerializerForView(serializers.ModelSerializer):
+    class Meta:
+        model = CategoryGridImage
+        fields = '__all__'
+        depth = 1
+        
+        
+class CarouselImageSerializer(serializers.Serializer):
+    category = serializers.PrimaryKeyRelatedField(queryset=Category.objects.all())
+    image = serializers.ImageField()
+    display_order = serializers.IntegerField(default=0)
+    
+    def create(self, validated_data):
+        carousel_image = CarouselImage.objects.create(**validated_data)
+        return carousel_image
+        
+class CarouselImageSerializerForView(serializers.ModelSerializer):
+    class Meta:
+        model = CarouselImage
+        fields = '__all__'
+        depth = 1

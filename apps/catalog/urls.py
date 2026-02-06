@@ -10,6 +10,9 @@ urlpatterns = [
     path('v1/brands/', views.BrandsView.as_view(),name="brands_view"),
     path('v1/brands/<str:slug>/', views.BrandDetailView.as_view(),name="brand_detail_view"),
     # path('v1/brands/<str:slug>/products/', views.BrandProductsView.as_view(),name="brand_products_view"),
-
+    path('v1/category_grid_images/', views.CategoryGridImageView.as_view(),name="category_grid_image_view"),
+    path('v1/category_grid_images/<int:pk>/', views.CategoryGridDetailView.as_view(),name="category_grid_image_detail_view"),
+    path('v1/carousel_images/', views.CarouselImageView.as_view(),name="carousel_image_view"),
+    path('v1/carousel_images/<int:pk>/', views.CarouselImageDetailView.as_view(),name="carousel_image_detail_view"),
         
 ]
