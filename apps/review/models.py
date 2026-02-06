@@ -61,6 +61,8 @@ class Review(ReviewBaseModel):
         max_length=20, choices=STATUS_CHOICES,
         default='pending', db_index=True
     )
+    is_verified_purchase=models.BooleanField(default=False)
+
 
     class Meta:
         unique_together = ['user', 'product'] 

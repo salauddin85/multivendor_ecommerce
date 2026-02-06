@@ -104,7 +104,7 @@ class OrderItem(OrderBaseModel):
     subtotal = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     
     def __str__(self):
-        return f"{self.store.store_name} - {self.product.title} - {self.order.order_number}"
+        return self.order.order_number
 
 
 
