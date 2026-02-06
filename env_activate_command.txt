@@ -1,5 +1,5 @@
- env\Scripts\activate.ps1
+env\Scripts\activate.ps1
 
 Ctrl + Alt + R  → Django runserver
 Ctrl + Alt + C    → Celery worker
-Ctrl + Alt + C + B    → Celery beat
+Ctrl + Alt + B    → Celery beat

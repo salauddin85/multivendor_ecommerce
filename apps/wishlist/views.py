@@ -3,12 +3,12 @@ import logging
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated,IsAdminUser
 from django.shortcuts import get_object_or_404
+
 
 from .models import Wishlist, WishlistItem
 from .serializers import (
-    WishlistCreateSerializer,
     WishlistListSerializer,
     WishlistItemCreateSerializer,
     WishlistItemSerializer
@@ -19,46 +19,16 @@ logger = logging.getLogger("myapp")
 
 
 class WishlistView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request):
-        try:
-            serializer = WishlistCreateSerializer(data=request.data, context={'request': request})
-            if serializer.is_valid():
-                wishlist = serializer.save()
-                return Response({
-                    "code": 201,
-                    "message": "Wishlist created successfully",
-                    "status": "success",
-                    "data": {
-                        "id": wishlist.id,
-                        "name": wishlist.name
-                    }
-                }, status=201)
-            return Response({
-                "code": 400,
-                "message": "Invalid data",
-                "status": "failed",
-                "errors": serializer.errors
-            }, status=400)
-
-        except Exception as e:
-            logger.exception(str(e))
-            return Response({
-                "code": 500,
-                "status": "failed",
-                "message": "Server error",
-                "errors": {"server": [str(e)]}
-            }, status=500)
+    permission_classes = [IsAuthenticated,IsAdminUser]
 
     def get(self, request):
         try:
-            wishlists = Wishlist.objects.filter(user=request.user)
+            wishlists = Wishlist.objects.all()
             serializer = WishlistListSerializer(wishlists, many=True)
 
             return Response({
                 "code": 200,
-                "message": "Wishlists fetched",
+                "message": "Wishlists fetched successfully",
                 "status": "success",
                 "data": serializer.data
             }, status=200)
@@ -69,76 +39,75 @@ class WishlistView(APIView):
 
 
 
-class WishlistDetailView(APIView):
+
+class WishlistItemAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def delete(self, request):
+    # ---------------------------
+    # Utility
+    # ---------------------------
+    def _get_default_wishlist(self, user):
+        wishlist, _ = Wishlist.objects.get_or_create(
+            user=user,
+            is_default=True,
+            defaults={"name": "My Wishlist"}
+        )
+        return wishlist
+
+    # ---------------------------
+    # POST → Add item
+    # ---------------------------
+    def post(self, request):
         try:
-            wishlist = Wishlist.objects.get(user=request.user)
-            wishlist.delete()
-            return Response({
-                "code": status.HTTP_204_NO_CONTENT,
-                "status": "success",
-                "message": "Wishlist deleted"
-            }, status=status.HTTP_204_NO_CONTENT)
-
-        except Wishlist.DoesNotExist:
-            return Response({
-                "code": status.HTTP_404_NOT_FOUND,
-                "status": "failed",
-                "message": "Wishlist not found",
-                "errors": {
-                    "wishlist": ["Wishlist not found"]
-                }
-            }, status=status.HTTP_404_NOT_FOUND)
-
-        except Exception as e:
-            logger.exception(str(e))
-            return Response({
-                "code": status.HTTP_500_INTERNAL_SERVER_ERROR,
-                "status": "failed",
-                "message": "Server error",
-                "errors": {"server": [str(e)]}
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-
-class WishlistItemView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def post(self, request, pk):
-        try:
-            wishlist = Wishlist.objects.get(id=pk, user=request.user)
+            wishlist = self._get_default_wishlist(request.user)
 
             serializer = WishlistItemCreateSerializer(
                 data=request.data,
-                context={'wishlist': wishlist}
+                context={"wishlist": wishlist}
             )
 
             if serializer.is_valid():
                 item = serializer.save()
-                return Response({
-                    "code": 201,
-                    "message": "Item added to wishlist",
-                    "status": "success",
-                    "data": {"id": item.id}
-                }, status=201)
 
+                return Response(
+                    {
+                        "code": status.HTTP_201_CREATED,
+                        "status": "success",
+                        "message": "Item added to wishlist",
+                        "data": {
+                            "id": item.id,
+                            "product": item.product.id,
+                            "variant": item.variant.id if item.variant else None,
+                        },
+                    },
+                    status=status.HTTP_201_CREATED,
+                )
+            else:
+                return Response(
+                    {
+                        "code": status.HTTP_400_BAD_REQUEST,
+                        "status": "failed",
+                        "message": "Invalid data",
+                        "errors": serializer.errors,
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+                
+        except Exception as e:
+            logger.exception("Wishlist add failed")
             return Response(
-                {"code": 400, "status": "failed", "message": "Invalid data", "errors": serializer.errors},
-                status=400
+                {
+                    "code": status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    "status": "failed",
+                    "message": "Server error",
+                    "errors": {"server": [str(e)]},
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
-        except Wishlist.DoesNotExist:
-            return Response({"code": 404,"status": "failed",  "message": "Wishlist not found", "errors": {"wishlist": ["Wishlist not found"]}}, status=404)
-        
-        except Exception as e:
-           logger.exception(str(e))
-           return Response({"code": 500, "status": "failed", "message": "Server error", "errors": {"server": [str(e)]}}, status=500)
-
-
-    def get(self, request, pk):
+    def get(self, request):
         try:
-            wishlist = Wishlist.objects.get(id=pk, user=request.user)
+            wishlist = Wishlist.objects.get(user=request.user)
             items = wishlist.items.select_related('product', 'variant').filter(wishlist=wishlist)
             serializer = WishlistItemSerializer(items, many=True)
 
@@ -169,21 +138,20 @@ class WishlistItemView(APIView):
 class WishlistItemDeleteView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def delete(self, request, pk, item_id):
+    def delete(self, request, item_id):
         try:
-            wishlist = Wishlist.objects.get(id=pk, user=request.user)
-            item = get_object_or_404(WishlistItem, id=item_id, wishlist=wishlist)
+            item = WishlistItem.objects.get(wishlist__user=request.user, id=item_id)
             item.delete()
             return Response({
                 "code": 204,
                 "message": "Item deleted from wishlist",
                 "status": "success"
             }, status=204)
-        except Wishlist.DoesNotExist:
+        except WishlistItem.DoesNotExist:
             return Response({"code": 404,
                              "status": "failed",
-                             "message": "Wishlist not found",
-                             "errors": {"wishlist": ["Wishlist not found"]}
+                             "message": "This item not found in wishlist",
+                             "errors": {"wishlist": ["This item not found in wishlist"]}
                              }, status=404)
         except Exception as e:
             logger.exception(str(e))
