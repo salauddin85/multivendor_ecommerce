@@ -86,3 +86,19 @@ class BrandAnalytics(CatalogBaseModel):
     def __str__(self):
         return self.brand.name
 
+
+class CategoryGridImage(CatalogBaseModel):
+    category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name="grid_images")
+    image = models.ImageField(upload_to="category_grid_images/")
+    display_order = models.IntegerField(default=0)
+    
+    def __str__(self):
+        return self.category.name
+    
+class CarouselImage(CatalogBaseModel):
+    category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name="carousel_images")
+    image = models.ImageField(upload_to="carousel_images/")
+    display_order = models.IntegerField(default=0)
+    
+    def __str__(self):
+        return self.category.name
