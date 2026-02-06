@@ -185,7 +185,7 @@ class ProductDetailSerializer(serializers.ModelSerializer):
         return ProductVariantSerializer(variants, many=True).data
 
     def get_reviews(self, obj):
-        reviews = Review.objects.filter(product=obj)
+        reviews = Review.objects.filter(product=obj, status='approved').order_by('-created_at')
         return ReviewListSerializer(reviews, many=True).data
 
     
