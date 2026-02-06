@@ -36,7 +36,7 @@ class ReviewView(APIView):
 
     def get(self, request):
         try:
-            reviews = Review.objects.select_related('user', 'product', 'variant').filter(user=request.user)
+            reviews = Review.objects.select_related('user', 'product', 'variant','vendor','store_owner','order').filter(user=request.user)
             serializer = ReviewListSerializer(reviews, many=True)
             return Response({
                 "code": 200,

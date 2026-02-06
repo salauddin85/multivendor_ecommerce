@@ -142,7 +142,7 @@ class ProductsDetailView(APIView):
             product = models.Product.objects.select_related(
                 "store", "category", "brand"
             ).prefetch_related(
-                "images", "attributes", "variants"
+                "images", "attributes", "variants","reviews"
             ).get(slug=slug)
 
             # ==============================

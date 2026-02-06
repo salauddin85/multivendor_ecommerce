@@ -4,6 +4,9 @@ from apps.stores.models import Store
 from apps.catalog.models import Category, Brand
 from django.db import transaction
 import re
+from apps.review.serializers import ReviewListSerializer
+from apps.review.models import Review
+
 
 
 
@@ -171,6 +174,7 @@ class ProductDetailSerializer(serializers.ModelSerializer):
     brand = BrandSerializerForProduct()
     category = CategorySerializerForProduct()
     store = ProductStoreForProductDetailsSerializer()
+    reviews = serializers.SerializerMethodField()
 
     def get_attributes(self, obj):
         attributes = models.ProductAttribute.objects.filter(product=obj)
@@ -179,6 +183,11 @@ class ProductDetailSerializer(serializers.ModelSerializer):
     def get_variants(self, obj):
         variants = models.ProductVariant.objects.filter(product=obj)
         return ProductVariantSerializer(variants, many=True).data
+
+    def get_reviews(self, obj):
+        reviews = Review.objects.filter(product=obj)
+        return ReviewListSerializer(reviews, many=True).data
+
     
 
     class Meta:
