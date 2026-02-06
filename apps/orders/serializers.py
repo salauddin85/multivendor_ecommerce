@@ -154,7 +154,7 @@ class OrderSerializer(serializers.Serializer):
                 variant_name = variant.variant_name
             else:
                 unit_price = product.base_price
-                unit_discount = Decimal("0.00")
+                unit_discount = product.discount_amount or Decimal("0.00")
                 variant_name = ""
 
             # -------- Calculation --------
