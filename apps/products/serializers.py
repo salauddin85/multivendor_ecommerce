@@ -147,17 +147,53 @@ class ProductImageSerializerForProduct(serializers.ModelSerializer):
         model = models.ProductImage
         fields = ['image']
 
+class VariantSimpleSerializerForProduct(serializers.ModelSerializer):
+    class Meta:
+        model = models.ProductVariant
+        fields = ['id','price','is_default']
 
 class ProductSerializerView(DynamicFieldsModelSerializer):
     store = serializers.StringRelatedField()
-    # images = ProductImageSerializerForProduct(many=True, read_only=True)
     brand = serializers.StringRelatedField()
     category = serializers.StringRelatedField()
-    
-    
+    variants = serializers.SerializerMethodField()
+    average_rating = serializers.FloatField(read_only=True)
+    total_reviews = serializers.IntegerField(
+        source="total_reviews_count", read_only=True
+    )
+
     class Meta:
         model = models.Product
-        fields = ['id','slug', 'store', 'category', 'brand', 'title', 'type', 'base_price', 'main_image', 'stock', 'is_featured', 'status']
+        fields = [
+            'id','slug',
+            'store','category','brand',
+            'title','type',
+            'base_price','main_image','stock',
+            'is_featured','status',
+            'average_rating','total_reviews',
+            'variants'
+        ]
+
+    def get_variants(self, obj):
+
+        variants = getattr(obj, "prefetched_variants", [])
+
+        if not variants:
+            return []
+
+        # priority → default
+        default_variant = next(
+            (v for v in variants if v.is_default), None
+        )
+
+        variant = default_variant or variants[0]
+
+        return {
+            "id": variant.id,
+            "price": variant.price,
+            "is_default": variant.is_default
+        }
+
 
 
 class ProductStoreForProductDetailsSerializer(serializers.ModelSerializer):

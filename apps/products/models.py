@@ -116,6 +116,9 @@ class ProductVariant(ProductBaseModel):
             ).exclude(pk=self.pk).update(is_default=False)
         super().save(*args, **kwargs)
     class Meta:
+        indexes = [
+            models.Index(fields=["product", "is_default", "created_at"]),
+        ]
         constraints = [
             models.UniqueConstraint(fields=['product', 'sku'], name='unique_product_variant')
         ]
