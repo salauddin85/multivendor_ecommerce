@@ -756,3 +756,167 @@ class AddExistingAddressToOrderView(APIView):
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+class AllOwnCancelOrderListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            canceled_orders = models.Order.objects.filter(status='cancelled', user=request.user).order_by("-id")
+            paginator = CustomPageNumberPagination()
+            result_page = paginator.paginate_queryset(canceled_orders, request)
+            serializer = serializers.OrderSerializerView(result_page, many=True)
+            log_request(request, "Fetched cancelled orders", "info",
+                        "cancelled orders fetched successfully", response_status_code=status.HTTP_200_OK)
+            return paginator.get_paginated_response(
+                {
+                    "code": status.HTTP_200_OK,
+                    "status": "success",
+                    "message": "Cancelled orders retrieved successfully.",
+                    "data": serializer.data,
+                }
+            )
+
+        except Exception as e:
+            logger.exception(str(e))
+            log_request(request, "Error fetching cancelled orders", "error",
+                        "An error occurred while retrieving cancelled orders", response_status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response(
+                {
+                    "code": status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    "status": "failed",
+                    "message": "An error occurred while retrieving cancelled orders.",
+                    "errors": {"server_error": [str(e)]},
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+            
+
+class AllOwnDeliveredOrderListView(APIView):
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        try:
+            delivered_orders = models.Order.objects.filter(status='delivered', user=request.user).order_by("-id")
+            paginator = CustomPageNumberPagination()
+            result_page = paginator.paginate_queryset(delivered_orders, request)
+            serializer = serializers.OrderSerializerView(result_page, many=True)
+            log_request(request, "Fetched delivered orders", "info",
+                        "Delivered orders fetched successfully", response_status_code=status.HTTP_200_OK)
+            return paginator.get_paginated_response(
+                {
+                    "code": status.HTTP_200_OK,
+                    "status": "success",
+                    "message": "Delivered orders retrieved successfully.",
+                    "data": serializer.data,
+                }
+            )
+
+        except Exception as e:
+            logger.exception(str(e))
+            log_request(request, "Error fetching delivered orders", "error",
+                        "An error occurred while retrieving delivered orders", response_status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response(
+                {
+                    "code": status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    "status": "failed",
+                    "message": "An error occurred while retrieving delivered orders.",
+                    "errors": {"server_error": [str(e)]},
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
+
+class OrderCancelView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request, pk):
+        try:
+            order = models.Order.objects.get(pk=pk, user=request.user)
+            if order.status in ['cancelled', 'delivered', 'refunded']:
+                return Response(
+                    {
+                        "code": status.HTTP_400_BAD_REQUEST,
+                        "status": "failed",
+                        "message": f"Order cannot be cancelled as it is already {order.status}.",
+                        "data": {
+                            "order_id": order.id,
+                            "order_number": order.order_number,
+                        }
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            order.status = 'cancelled'
+            order.save()
+            log_request(request, "Order cancelled", "info",
+                        "Order cancelled successfully", response_status_code=status.HTTP_200_OK)
+            return Response(
+                {
+                    "code": status.HTTP_200_OK,
+                    "status": "success",
+                    "message": "Order cancelled successfully.",
+                    "data": {
+                        "order_id": order.id,
+                        "order_number": order.order_number,
+                    },
+                },
+                status=status.HTTP_200_OK,
+            )
+        except models.Order.DoesNotExist:
+            return Response(
+                {
+                    "code": status.HTTP_404_NOT_FOUND,
+                    "status": "failed",
+                    "message": "Order not found.",
+                    "errors":{
+                        "order_id": [f"Order not found with id {pk}"]
+                    }
+                },
+                status=status.HTTP_404_NOT_FOUND,
+            )
+                    
+        except Exception as e:
+            logger.exception(str(e))
+            log_request(request, "Error cancelling order", "error",
+                        "An error occurred while cancelling order", response_status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({
+                "code": status.HTTP_500_INTERNAL_SERVER_ERROR,
+                "status": "failed",
+                "message": "An error occurred while cancelling order.",
+                "errors": {"server_error": [str(e)]},
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+            
+class AllOwnConfirmedOrderListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            confirmed_orders = models.Order.objects.filter(status='confirmed', user=request.user).order_by("-id")
+            paginator = CustomPageNumberPagination()
+            result_page = paginator.paginate_queryset(confirmed_orders, request)
+            serializer = serializers.OrderSerializerView(result_page, many=True)
+            log_request(request, "Fetched confirmed orders", "info",
+                        "Confirmed orders fetched successfully", response_status_code=status.HTTP_200_OK)
+            return paginator.get_paginated_response(
+                {
+                    "code": status.HTTP_200_OK,
+                    "status": "success",
+                    "message": "Confirmed orders retrieved successfully.",
+                    "data": serializer.data,
+                }
+            )
+
+        except Exception as e:
+            logger.exception(str(e))
+            log_request(request, "Error fetching confirmed orders", "error",
+                        "An error occurred while retrieving confirmed orders", response_status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response(
+                {
+                    "code": status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    "status": "failed",
+                    "message": "An error occurred while retrieving confirmed orders.",
+                    "errors": {"server_error": [str(e)]},
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )

@@ -1344,6 +1344,16 @@ class LatestProductsView(APIView):
             queryset = (
                 models.Product.objects
                 .select_related('brand', 'category', 'store')
+                .annotate(
+                    average_rating=Avg(
+                        "reviews__rating",
+                        filter=Q(reviews__status="approved")
+                    ),
+                    total_reviews_count=Count(
+                        "reviews",
+                        filter=Q(reviews__status="approved")
+                    )
+                )
                 .prefetch_related(
                     Prefetch(
                         'variants',
@@ -1409,6 +1419,16 @@ class BestSellingProductsView(APIView):
             products_qs = (
                 models.Product.objects.filter(id__in=product_ids, status="published")
                 .select_related('store', 'brand', 'category')
+                .annotate(
+                    average_rating=Avg(
+                        "reviews__rating",
+                        filter=Q(reviews__status="approved")
+                    ),
+                    total_reviews_count=Count(
+                        "reviews",
+                        filter=Q(reviews__status="approved")
+                    )
+                )
                 .prefetch_related(
                     Prefetch(
                         'variants',
@@ -1432,6 +1452,16 @@ class BestSellingProductsView(APIView):
                     models.Product.objects.filter(status="published")
                     .exclude(id__in=product_ids)
                     .select_related('store', 'brand', 'category')
+                    .annotate(
+                        average_rating=Avg(
+                            "reviews__rating",
+                            filter=Q(reviews__status="approved")
+                        ),
+                        total_reviews_count=Count(
+                            "reviews",
+                            filter=Q(reviews__status="approved")
+                        )
+                    )
                     .prefetch_related(
                         Prefetch(
                             'variants',
@@ -1473,65 +1503,6 @@ class BestSellingProductsView(APIView):
                 "errors": {"server_error": [str(e)]}
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-class BestSellingProductsView(APIView):
-    """
-    Get 15 best selling products (fully optimized)
-    """
-    def get(self, request):
-        try:
-            # Annotate products with total_sales
-            orderitems = (
-                OrderItem.objects.filter(
-                    product_id=OuterRef('pk'),
-                    order__payment_status='paid',
-                    order__status__in=['confirmed','completed','delivered']
-                ).values('product_id')
-                 .annotate(total_quantity_sold=Sum('quantity'))
-                 .values('total_quantity_sold')
-            )
-
-            products_qs = (
-                models.Product.objects.filter(status='published')
-                .select_related('store', 'brand', 'category')
-                .annotate(total_sales=Coalesce(Subquery(orderitems, output_field=IntegerField()), 0))
-                .prefetch_related(
-                    Prefetch(
-                        'variants',
-                        queryset=models.ProductVariant.objects.only(
-                            'id', 'price', 'is_default', 'product_id', 'created_at'
-                        ).order_by('created_at'),
-                        to_attr='prefetched_variants'
-                    )
-                )
-                .order_by('-total_sales', '-created_at')[:16]
-            )
-
-            paginator = CustomPageNumberPagination()
-            paginator.page_size = 16
-            paginated_products = paginator.paginate_queryset(products_qs, request, view=self)
-
-            product_list = []
-            for product in paginated_products:
-                product_data = serializers.ProductSerializerView(product).data
-                product_data['total_sales'] = product.total_sales
-                product_list.append(product_data)
-
-            return paginator.get_paginated_response({
-                "code": status.HTTP_200_OK,
-                "status": "success",
-                "message": "Best selling products fetched successfully",
-                "data": product_list
-            })
-
-        except Exception as e:
-            logger.exception(str(e))
-            return Response({
-                "code": status.HTTP_500_INTERNAL_SERVER_ERROR,
-                "status": "error",
-                "message": "Failed to fetch best selling products",
-                "errors": {"server_error": [str(e)]}
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
 
 class TopFiveCategoriesProductView(APIView):
     """
@@ -1555,10 +1526,20 @@ class TopFiveCategoriesProductView(APIView):
                 Prefetch(
                     'products',
                     queryset=models.Product.objects.filter(
-                        status="published"
-                    ).select_related(
-                        'store', 'brand', 'category'
-                    ).prefetch_related(
+                        status="published")
+                    .select_related(
+                        'store', 'brand', 'category')
+                    .annotate(
+                        average_rating=Avg(
+                            "reviews__rating",
+                            filter=Q(reviews__status="approved")
+                        ),
+                        total_reviews_count=Count(
+                            "reviews",
+                            filter=Q(reviews__status="approved")
+                        )
+                    )
+                    .prefetch_related(
                         Prefetch(
                             'variants',
                             queryset=models.ProductVariant.objects
