@@ -166,7 +166,7 @@ class ReviewCreateSerializer(serializers.Serializer):
             product=product,
             order__status="delivered",
             order__payment_status="paid"
-        ).exists()
+        ).select_related("order").first()
         
 
         if not has_purchased:
@@ -181,67 +181,38 @@ class ReviewCreateSerializer(serializers.Serializer):
         # Attach objects for create()
         attrs["product"] = product
         attrs["variant"] = variant
+        attrs["order"] = has_purchased.order
+
 
         return attrs
 
+    
+    
     @transaction.atomic
     def create(self, validated_data):
-        user = self.context['request'].user
-        product = Product.objects.get(id=validated_data['product_id'])
-        variant = None
-        if validated_data.get('variant_id'):
-            variant = ProductVariant.objects.get(id=validated_data['variant_id'])
+        user = self.context["request"].user
+        product = validated_data["product"]
+        variant = validated_data.get("variant")
+        order = validated_data["order"]
+
         vendor = product.store.vendor if product.store else None
         store_owner = product.store.owner if product.store else None
-        try:
-            order=Order.objects.get(user=user)
-            
-        except Order.DoesNotExist:
-            raise serializers.ValidationError(
-                {"non_field_errors": ["You can only review products when you have purchased."]}
-            )    
-        
-        if vendor :
-            review = Review.objects.create(
-                user=user,
-                product=product,
-                variant=variant,
-                vendor=vendor, 
-                status='pending',
-                order=order,
-                rating=validated_data['rating'],
-                comment=validated_data.get('comment', ''),
-                is_verified_purchase=True,
 
-            )
-     
-            
-        elif store_owner:
-            review = Review.objects.create(
-                user=user,
-                product=product,
-                variant=variant,
-                store_owner=store_owner,
-                status='pending',
-                order=order,
-                rating=validated_data['rating'],
-                comment=validated_data.get('comment', ''),
-                is_verified_purchase=True,
-            )
-            
-        else:
-            review = Review.objects.create(
-                user=user,
-                product=product,
-                variant=variant,
-                order=order,
-                status='pending',
-                rating=validated_data['rating'],
-                comment=validated_data.get('comment', ''),
-                is_verified_purchase=True,
-            )
-        
+        review = Review.objects.create(
+            user=user,
+            product=product,
+            variant=variant,
+            vendor=vendor if vendor else None,
+            store_owner=store_owner if store_owner else None,
+            order=order,
+            rating=validated_data["rating"],
+            comment=validated_data.get("comment", ""),
+            status="pending",
+            is_verified_purchase=True,
+        )
+
         return review
+
 class ReviewListSerializer(serializers.ModelSerializer):
 
     class Meta:
