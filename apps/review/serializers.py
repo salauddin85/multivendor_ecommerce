@@ -9,108 +9,6 @@ from apps.orders.models import OrderItem,Order
 from django.core.exceptions import ObjectDoesNotExist
 
 
-# class ReviewCreateSerializer(serializers.Serializer):
-#     product_id = serializers.IntegerField(write_only=True)
-#     variant_id = serializers.IntegerField(write_only=True, required=False, allow_null=True)
-#     rating = serializers.IntegerField()
-#     comment = serializers.CharField()
-#     def validate(self, attrs):
-#         try:
-#             request = self.context["request"]
-#             user = request.user
-
-#             product_id = attrs.get("product_id")
-#             variant_id = attrs.get("variant_id")
-
-#             # ---------- PRODUCT VALIDATION ----------
-#             try:
-#                 product = Product.objects.get(id=product_id, status="published")
-#             except ObjectDoesNotExist:
-#                 raise serializers.ValidationError(
-#                     {"product_id": ["Invalid or unpublished product."]}
-#                 )
-
-#             # ---------- VARIANT VALIDATION ----------
-#             variant = None
-#             if variant_id:
-#                 try:
-#                     variant = ProductVariant.objects.get(id=variant_id, product=product)
-#                 except ObjectDoesNotExist:
-#                     raise serializers.ValidationError(
-#                         {"variant_id": ["Invalid variant for this product."]}
-#                     )
-
-#             # ---------- DUPLICATE REVIEW CHECK ----------
-#             if Review.objects.filter(user=user, product=product, variant=variant).exists():
-#                 raise serializers.ValidationError(
-#                     {"non_field_errors": ["You have already reviewed this product."]}
-#                 )
-
-#             # ---------- PURCHASE VALIDATION ----------
-#             has_purchased = OrderItem.objects.filter(
-#                 order__user=user,
-#                 product=product,
-#                 order__status="delivered",
-#                 order__payment_status="paid",
-#             ).exists()
-
-#             if not has_purchased:
-#                 raise serializers.ValidationError(
-#                     {
-#                         "non_field_errors": [
-#                             "You can only review products you have purchased."
-#                         ]
-#                     }
-#                 )
-
-#             # Attach objects for create()
-#             attrs["product"] = product
-#             attrs["variant"] = variant
-
-#             return attrs
-
-#         except Exception as e:
-#             raise serializers.ValidationError(
-#                 {"non_field_errors": ["Failed to create review. Please try again later."]}
-#             )
-
-#     @transaction.atomic
-#     def create(self, validated_data):
-#         try:
-#             user = self.context["request"].user
-#             product = validated_data.pop("product")
-#             variant = validated_data.pop("variant", None)
-
-#             vendor = getattr(product.store, "vendor", None)
-#             store_owner = getattr(product.store, "owner", None)
-
-#             review_data = {
-#                 "user": user,
-#                 "product": product,
-#                 "variant": variant,
-#                 "rating": validated_data.get("rating"),
-#                 "comment": validated_data.get("comment", ""),
-#                 "status": "pending",
-#                 "is_verified_purchase": True,
-#             }
-
-#             if vendor:
-#                 review_data["vendor"] = vendor
-#             elif store_owner:
-#                 review_data["store_owner"] = store_owner
-
-#             review = Review.objects.create(**review_data)
-#             return review
-
-#         except Exception as e:
-#             raise serializers.ValidationError(
-#                 {"non_field_errors": ["Failed to create review. Please try again later."]}
-#             )
-# # GET serializer
-
-
-
-
 class ReviewCreateSerializer(serializers.Serializer):
     product_id = serializers.IntegerField(write_only=True)
     variant_id = serializers.IntegerField(
@@ -212,9 +110,14 @@ class ReviewCreateSerializer(serializers.Serializer):
         )
 
         return review
+    
+class SimpleProductSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Product
+        fields = ["slug"]
 
 class ReviewListSerializer(serializers.ModelSerializer):
-
+    product = serializers.StringRelatedField(source = "product.slug", read_only=True)
     class Meta:
         model = Review
-        fields = ['id', 'user', 'product','variant', 'rating', 'comment', 'status', 'created_at','vendor','store_owner','order','is_verified_purchase']
+        fields = ['id', 'user', 'product', 'rating', 'comment', 'status', 'created_at','vendor','store_owner','order','is_verified_purchase']

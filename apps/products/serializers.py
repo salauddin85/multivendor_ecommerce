@@ -521,3 +521,13 @@ class SingleProductDetailInformationSerializerView(serializers.ModelSerializer):
             "attributes",
             "variants"
         ]
+
+
+class SingleProductDetailSerializer(serializers.ModelSerializer):
+    category = serializers.StringRelatedField()
+    brand = serializers.StringRelatedField()
+    images = ProductImageSerializerView(many=True, read_only=True)
+
+    class Meta:
+        model = models.Product
+        fields = ['id','slug','title','category','brand','description','specification','base_price','main_image','stock','type','discount_amount','images']

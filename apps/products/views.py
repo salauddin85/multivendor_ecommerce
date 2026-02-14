@@ -1604,3 +1604,35 @@ class TopFiveCategoriesProductView(APIView):
                 "message": "Failed to fetch categories with products",
                 "errors": {"server_error": [str(e)]}
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+            
+
+class SingleProductDetailView(APIView):
+    
+    def get(self,request,pk):
+        try:
+            product = models.Product.objects.prefetch_related('images').get(pk=pk)
+            serializer = serializers.SingleProductDetailSerializer(product)
+            return Response({
+                "code": status.HTTP_200_OK,
+                "status": "success",
+                "message": "Product fetched successfully",
+                "data": serializer.data
+            }, status=status.HTTP_200_OK)
+        except models.Product.DoesNotExist:
+            return Response({
+                "code": status.HTTP_404_NOT_FOUND,
+                "status": "failed",
+                "message": "Product not found",
+                "data": {
+                    "product": f"Product not found with id {pk}"
+                }
+            }, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            logger.exception(str(e))
+            return Response({
+                "code": status.HTTP_500_INTERNAL_SERVER_ERROR,
+                "status": "error",
+                "message": "Failed to fetch product",
+                "errors": {"server_error": [str(e)]}
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
