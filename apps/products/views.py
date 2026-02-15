@@ -331,7 +331,8 @@ class ProductsDetailView(APIView):
             return Response({
                 "code": status.HTTP_404_NOT_FOUND,
                 "status": "failed",
-                "message": "Product not found"
+                "message": "Product not found",
+                "errors": { "product": [f"Product not found with slug {slug}"] }
             }, status=status.HTTP_404_NOT_FOUND)
 
         except Exception as e:
